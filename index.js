@@ -30,18 +30,24 @@ const statusLineRegex = /^(HTTP\/\d*\.\d*) (\d*) (.*)$/im; // HTTP/1.1 200 OK
 const headersRegex = /^(.*?): ?(.*)$/m; // Host: localhost
 const hostnameRegex = /[^:]*/; // localhost (excludes port)
 
+// Log
+if (whitelist) log(`\nWhitelist: ${whitelist.length}\n${whitelist.join("\n")}`);
+if (blacklist) log(`\nBlacklist: ${blacklist.length}\n${blacklist.join("\n")}`);
+log(`\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`)}`);
+log();
+
 // Create proxy server
 const proxyServer = (config.tls ? tls : net).createServer({
     key: fs.existsSync(config.key) ? fs.readFileSync(config.key) : undefined,
     cert: fs.existsSync(config.cert) ? fs.readFileSync(config.cert) : undefined,
-    ...config.additionalServerOptions
+    ...config.additionalProxyServerOptions
 });
 
 // Proxy server on connection
 proxyServer.on("connection", proxyConnection => {
     // Get IP
     const ip = proxyConnection.remoteAddress.split("::ffff:")[1] || proxyConnection.remoteAddress;
-    
+
     // Whitelist
     if (whitelist && !ipMatch(ip, whitelist)) {
         log(`Unwhitelisted IP ${ip} attempted to connect!`);
@@ -53,25 +59,81 @@ proxyServer.on("connection", proxyConnection => {
         return proxyConnection.destroy();
     }
 
-    log(`New connection from ${ip}`);
+    logAdditional(`New connection from ${ip}`);
 
     let serverConnection;
 
     proxyConnection.on("data", data => {
-        const splitData = data.toString().split("\r\n");
-        
-        const [requestLine, method, uri, version] = splitData[0].match(requestLineRegex) || [];
-        const headers = getHeaders(splitData);
+        const [rawHeaders, rawData = ""] = data.toString().split("\r\n\r\n");
+        const splitHeaders = rawHeaders.split("\r\n");
 
-        const [hostname] = (headers["Host"] || headers["host"])?.match(hostnameRegex) || [];
-        
-        // TODO: EVERYTHING!!!!
-        console.log(requestLine, method, uri, version, hostname);
+        const [requestLine, method, uri, version] = splitHeaders[0].match(requestLineRegex) || [];
+        if (requestLine) {            
+            const headers = getHeaders(splitHeaders); // Get headers
+            
+            const realIp = config.realIpHeader ? headers[config.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
+            
+            // Make sure using supported version
+            if (config.supportedVersions && !config.supportedVersions.includes(version)) {
+                logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} using unsupported version ${version}`);
+                return proxyConnection.destroy();
+            }
+
+            // Get hostname
+            const [hostname] = headers["Host"]?.match(hostnameRegex) || [];
+
+            // Find server
+            if (!findServer(hostname)) {
+                logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} went to unknown hostname ${hostname}`);
+                return proxyConnection.destroy();
+            }
+
+            const foundServerOptions = { ...config.defaultServerOptions, ...findServer(hostname) }; // Get default server options + found server options
+
+            // Modify headers
+            Object.entries(foundServerOptions.modifiedHeaders || { }).forEach(([header, value]) => {
+                if (!value) {
+                    delete headers[header];
+                } else
+                    headers[header] = value;
+            });
+
+            // Reconstruct data
+            const reconstructedData = Buffer.concat([
+                Buffer.from(requestLine),
+                Buffer.from("\r\n"),
+                Buffer.from(Object.entries(headers).map(i => `${i[0]}: ${i[1]}`).join("\r\n")),
+                Buffer.from("\r\n\r\n"),
+                Buffer.from(rawData)
+            ]);
+
+            // console.log(reconstructedData.toString())
+
+            if (!serverConnection || serverConnection.ended) {
+                // Connect to server
+                serverConnection = (foundServerOptions.useTls ? tls : net).connect({
+                    host: foundServerOptions.serverHostname,
+                    port: foundServerOptions.serverPort,
+                    rejectUnauthorized: false,
+                    ...foundServerOptions.additionalServerOptions
+                });
+
+                serverConnection.on("data", i => { if (!proxyConnection.ended) proxyConnection.write(i) });
+                serverConnection.on("close", i => { if (!proxyConnection.ended) proxyConnection.end() });
+                serverConnection.on("error", err => console.error("Server error:", err)); // This is usually fine
+            }
+
+            if (serverConnection && !serverConnection.ended) serverConnection.write(reconstructedData);
+        } else
+            if (serverConnection && !serverConnection.ended) serverConnection.write(data);
     });
+
+    proxyConnection.on("close", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
+    proxyConnection.on("error", err => console.error("Proxy error:", err)); // This is usually fine
 });
 
 // Listen
-proxyServer.listen(config.port, config.hostname, () => console.log(`Listening at :${config.port}`))
+proxyServer.listen(config.port, config.hostname, () => log(`Listening at :${config.port}`))
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -79,6 +141,10 @@ function readJson(filePath) {
 
 function log(...msg) {
     if (config.logging) console.log(...msg);
+}
+
+function logAdditional(...msg) {
+    if (config.additionalLogging) console.log(...msg);
 }
 
 function ipMatch(ip, matches) {
@@ -99,10 +165,18 @@ function ipMatch(ip, matches) {
     return matched;
 }
 
-function getHeaders(splitData) {
-    return Object.fromEntries(splitData.map(i => {
+function getHeaders(splitHeaders) {
+    return Object.fromEntries(splitHeaders.map(i => {
         const match = i.match(headersRegex);
         if (!match) return null;
         return [match[1], match[2]];
     }).filter(i => i));
+}
+
+function findServer(hostname) {
+    return servers.find(i => i?.proxyHostnames?.find(i =>
+        i.startsWith(".") ? hostname.endsWith(i) :
+        i.endsWith(".") ? hostname.startsWith(i) :
+        hostname == i
+    ));
 }

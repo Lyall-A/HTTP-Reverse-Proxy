@@ -1,21 +1,23 @@
 {
-    "port": 8080,
+    "port": 80,
     "hostname": null,
     "logging": true,
+    "additionalLogging": false,
     "tls": false,
     "key": null,
     "cert": null,
     "whitelist": "whitelist.json",
     "blacklist": null,
+    "realIpHeader": "CF-Connecting-IP",
     "supportedVersions": [
         "HTTP/1.1"
     ],
-    "additionalServerOptions": {
+    "additionalProxyServerOptions": {
 
     },
     "defaultServerOptions": {
         "modifiedHeaders": {
-            
+            "Host": null
         }
     }
 }
