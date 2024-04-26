@@ -95,7 +95,10 @@ proxyServer.on("connection", proxyConnection => {
                 if (!value) {
                     delete headers[header];
                 } else
-                    headers[header] = value;
+                    headers[header] = formatString(value, {
+                        serverHostname: foundServerOptions.serverHostname,
+                        serverPort: foundServerOptions.serverPort
+                    });
             });
 
             // Reconstruct data
@@ -179,4 +182,10 @@ function findServer(hostname) {
         i.endsWith(".") ? hostname.startsWith(i) :
         hostname == i
     ));
+}
+
+function formatString(string, options) {
+    let formatted = string;
+    Object.entries(options).forEach(([key, value]) => formatted = formatted.replace(new RegExp(`%{${key}}`, "g"), value));
+    return formatted;
 }
