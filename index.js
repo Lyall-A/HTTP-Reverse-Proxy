@@ -7,8 +7,8 @@ let config = readJson("config.json");
 fs.watchFile("config.json", () => config = readJson("config.json"));
 
 // Servers
-let servers = readJson("servers.json");
-fs.watchFile("servers.json", () => servers = readJson("servers.json"));
+let servers = readJson("servers.json").filter(i => !i?.disabled);
+fs.watchFile("servers.json", () => servers = readJson("servers.json").filter(i => !i?.disabled));
 
 // Whitelist
 let whitelist;
