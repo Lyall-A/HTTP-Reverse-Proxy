@@ -21,7 +21,8 @@
             "X-Forwarded-For": null,
             "CDN-Loop": null,
             "CF-Visitor": null,
-            "CF-RAY": null
+            "CF-RAY": null,
+            "Origin": null
         }
     }
 }
