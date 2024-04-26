@@ -33,7 +33,7 @@ const hostnameRegex = /[^:]*/; // localhost (excludes port)
 // Log
 if (whitelist) log(`\nWhitelist: ${whitelist.length}\n${whitelist.join("\n")}`);
 if (blacklist) log(`\nBlacklist: ${blacklist.length}\n${blacklist.join("\n")}`);
-log(`\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`)}`);
+log(`\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}`);
 log();
 
 // Create proxy server
