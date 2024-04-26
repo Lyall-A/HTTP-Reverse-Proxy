@@ -17,7 +17,11 @@
     },
     "defaultServerOptions": {
         "modifiedHeaders": {
-            "Host": null
+            "Host": "%{serverHostname}:%{serverPort}",
+            "X-Forwarded-For": null,
+            "CDN-Loop": null,
+            "CF-Visitor": null,
+            "CF-RAY": null
         }
     }
 }
