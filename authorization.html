@@ -36,6 +36,7 @@
     <style>
         :root {
             --bg: rgb(35, 34, 37);
+            --lightgrey: rgb(163, 163, 163);
             --grey: rgb(136, 136, 136);
             --white: rgb(221, 221, 221);
             --black: rgb(44, 44, 44);
@@ -92,7 +93,12 @@
             color: var(--black);
         }
 
-        a { color: var(--grey) }
+        a {
+            color: var(--grey);
+            transition: color 0.2s ease;
+        }
+
+        a:hover { color: var(--lightgrey) }
 
         h1 {
             margin: 0;
