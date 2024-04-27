@@ -86,13 +86,15 @@ proxyServer.on("connection", proxyConnection => {
             // Get hostname
             const [hostname] = (headers["Host"] || headers["host"])?.match(hostnameRegex) || [];
 
+            const foundServer = findServer(hostname);
+
             // Find server
-            if (!findServer(hostname)) {
+            if (!foundServer) {
                 logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach unknown hostname ${hostname}`);
                 return proxyConnection.destroy();
             }
 
-            const foundServerOptions = { ...config.defaultServerOptions, ...findServer(hostname) }; // Get default server options + found server options
+            const foundServerOptions = objectDefaults(foundServer, config.defaultServerOptions || { }); // Get default server options + found server options
 
             // Server requires authorization
             if (foundServerOptions.authorization) {
@@ -120,11 +122,13 @@ proxyServer.on("connection", proxyConnection => {
             }
 
             // Modify headers
+
             Object.entries(foundServerOptions.modifiedHeaders || { }).forEach(([header, value]) => {
                 if (!value) {
                     delete headers[header];
                 } else
                     headers[header] = formatString(value, {
+                        proxyHostname: hostname,
                         serverHostname: foundServerOptions.serverHostname,
                         serverPort: foundServerOptions.serverPort
                     });
@@ -229,4 +233,16 @@ function parseCookies(cookiesString) {
 
 function stringifyCookies(cookies) {
     return Object.entries(cookies).map(i => `${i[0]}=${i[1]}`).join("; ");
+}
+
+function objectDefaults(obj, def) {
+    if (typeof obj != "object") return def;
+    
+    return (function checkEntries(object = obj, defaultObj = def) {
+        Object.entries(defaultObj).forEach(([key, value]) => {
+            if (object[key] == undefined) object[key] = value;
+            else if (value != null && typeof value == "object") checkEntries(object[key], defaultObj[key]);
+        });
+        return object;
+    })();
 }
