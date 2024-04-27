@@ -137,13 +137,13 @@ proxyServer.on("connection", proxyConnection => {
 
             Object.entries(foundServerOptions.modifiedHeaders || { }).forEach(([header, value]) => {
                 if (!value) {
-                    delete headers[header];
+                    setHeader(headers, header);
                 } else
-                    headers[header] = formatString(value, {
+                    setHeader(headers, header, formatString(value, {
                         proxyHostname: hostname,
                         serverHostname: foundServerOptions.serverHostname,
                         serverPort: foundServerOptions.serverPort
-                    });
+                    }));
             });
 
             // Reconstruct data
@@ -277,5 +277,7 @@ function getHeader(headers, name) {
 
 function setHeader(headers, name, value) {
     const key = Object.keys(headers).find(i => i.toLowerCase() == name.toLowerCase());
-    headers[key || name] = value;
+    value ?
+        headers[key || name] = value :
+        delete headers[key || name];
 }
