@@ -1,8 +1,106 @@
-<script>
-    let authorization;
-    while (!authorization) {
-        authorization = prompt("Authorization required");
-    };
-    document.cookie = `%{authorizationCookie}=${authorization}`;
-    location.reload();
-</script>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap" rel="stylesheet">
+    <title>Authorization</title>
+</head>
+
+<body>
+    <div id="container">
+        <div id="form">
+            <h1>Proxy Authorization</h1>
+            <input type="password" placeholder="Password" id="password">
+            <button onclick="authorize()">Authorize</button>
+        </div>
+    </div>
+
+    <footer><a href="https://github.com/Lyall-A/HTTP-Reverse-Proxy">HTTP Reverse Proxy</a> on GitHub</footer>
+
+    <script>
+        document.title = `${location.hostname} | Proxy Authorization`;
+
+        document.onkeydown = e => (e.keyCode == 13 && document.activeElement?.id == "password") ? authorize() : null;
+
+        function authorize() {
+            const password = document.getElementById("password");
+            if (!password.value) {
+                password.classList.add("badField");
+                return;
+            }
+            document.cookie = `%{authorizationCookie}=${password.value}`;
+            location.reload();
+        }
+    </script>
+
+    <style>
+        :root {
+            --bg: rgb(35, 34, 37);
+            --grey: rgb(136, 136, 136);
+            --white: rgb(221, 221, 221);
+            --black: rgb(44, 44, 44);
+        }
+
+        * {
+            font-family: "Roboto";
+            text-decoration: none;
+            text-align: center;
+        }
+
+        body {
+            padding: 0;
+            margin: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            background-color: var(--bg);
+        }
+
+        #container {
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            flex: 1;
+        }
+        
+        #form {
+            display: flex;
+            flex-direction: column;
+            border: 5px solid var(--grey);
+            border-radius: 20px;
+            padding: 50px;
+        }
+
+        #password { transition: border-color 0.2s ease }
+
+        .badField:not(:focus) { border-color: rgb(255, 51, 0) !important }
+
+        footer {
+            margin-top: auto;
+            margin-bottom: 5px;
+            margin-top: 5px;
+        }
+        
+        button, input {
+            border: 3px solid var(--grey);
+            border-radius: 10px;
+            height: 50px;
+            margin-top: 30px;
+            font-size: 1.5em;
+            color: var(--black);
+        }
+
+        a { color: var(--grey) }
+
+        h1 {
+            margin: 0;
+            margin-bottom: 40px;
+        }
+        
+        h1, footer { color: var(--white) }
+    </style>
+</body>
+
+</html>
