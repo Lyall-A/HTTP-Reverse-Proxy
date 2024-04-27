@@ -20,6 +20,7 @@
         "modifiedHeaders": {
             "Host": "%{serverHostname}:%{serverPort}",
             "X-Forwarded-For": null,
+            "X-Forwarded-Proto": null,
             "CDN-Loop": null,
             "CF-Visitor": null,
             "CF-RAY": null,

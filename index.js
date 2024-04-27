@@ -99,7 +99,7 @@ proxyServer.on("connection", proxyConnection => {
             }
 
             // Get hostname
-            const [hostname] = (headers["Host"] || headers["host"])?.match(hostnameRegex) || [];
+            const [hostname] = getHeader(headers, "Host")?.match(hostnameRegex) || [];
 
             const foundServer = findServer(hostname);
 
@@ -119,7 +119,7 @@ proxyServer.on("connection", proxyConnection => {
                     return proxyConnection.destroy();
                 }
                 
-                const cookies = parseCookies(headers["Cookie"] || headers["cookie"] || "");
+                const cookies = parseCookies(getHeader(headers, "Cookie") || "");
 
                 if (cookies[config.authorizationCookie] != foundServerOptions.authorizationPassword) {
                     // Incorrect or no authorization cookie
@@ -130,10 +130,7 @@ proxyServer.on("connection", proxyConnection => {
 
                 // Remove cookie before sending to server
                 delete cookies[config.authorizationCookie];
-                if (headers["Cookie"])
-                    headers["Cookie"] = stringifyCookies(cookies); else
-                if (headers["cookie"])
-                    headers["cookie"] = stringifyCookies(cookies);
+                setHeader(headers, "Cookie", stringifyCookies(cookies));
             }
 
             // Modify headers
@@ -271,4 +268,14 @@ function watch(file, json, callback) {
             console.error(`Failed to read ${file}, error:`, err);
         }
     });
+}
+
+function getHeader(headers, name) {
+    const key = Object.keys(headers).find(i => i.toLowerCase() == name.toLowerCase());
+    return headers[key];
+}
+
+function setHeader(headers, name, value) {
+    const key = Object.keys(headers).find(i => i.toLowerCase() == name.toLowerCase());
+    headers[key || name] = value;
 }
