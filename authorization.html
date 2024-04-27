@@ -20,6 +20,8 @@
     <script>
         document.title = `${location.hostname} | Proxy Authorization`;
 
+        document.getElementById("password").focus();
+
         document.onkeydown = e => (e.keyCode == 13 && document.activeElement?.id == "password") ? authorize() : null;
 
         function authorize() {
