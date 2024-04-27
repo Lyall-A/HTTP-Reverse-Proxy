@@ -4,28 +4,43 @@ const fs = require("fs");
 
 // Config
 let config = readJson("config.json");
-fs.watchFile("config.json", () => config = readJson("config.json"));
+watch("config.json", true, file => {
+    config = file;
+    console.log("Updated config");
+});
 
 // Servers
 let servers = readJson("servers.json").filter(i => !i?.disabled);
-fs.watchFile("servers.json", () => servers = readJson("servers.json").filter(i => !i?.disabled));
+watch("servers.json", true, file => {
+    servers = file.filter(i => !i?.disabled);
+    console.log("Updated servers");
+});
 
 // Authorization HTML
 let authorizationHtml = formatString(fs.readFileSync("authorization.html", "utf-8"), { authorizationCookie: config.authorizationCookie });
-fs.watchFile("authorization.html", () => authorizationHtml = formatString(fs.readFileSync("authorization.html", "utf-8"), { authorizationCookie: config.authorizationCookie }));
+watch("authorization.html", false, file => {
+    authorizationHtml = formatString(file, { authorizationCookie: config.authorizationCookie });
+    console.log("Updated authorization HTML");
+});
 
 // Whitelist
 let whitelist;
 if (config.whitelist) {
     whitelist = readJson(config.whitelist);
-    fs.watchFile(config.whitelist, () => whitelist = readJson(config.whitelist));
+    watch(config.whitelist, true, file => {
+        whitelist = file;
+        console.log("Updated whitelist");
+    });
 }
 
 // Blacklist
 let blacklist;
 if (config.blacklist) {
     blacklist = readJson(config.blacklist);
-    fs.watchFile(config.blacklist, () => blacklist = readJson(config.blacklist));
+    watch(config.blacklist, true, file => {
+        blacklist = file;
+        console.log("Updated blacklist");
+    });
 }
 
 // Regex
@@ -245,4 +260,15 @@ function objectDefaults(obj, def) {
         });
         return object;
     })();
+}
+
+function watch(file, json, callback) {
+    fs.watchFile(file, () => {
+        if (!json) return callback(fs.readFileSync(file, "utf-8"));
+        try {
+            callback(readJson(file));
+        } catch (err) {
+            console.error(`Failed to read ${file}, error:`, err);
+        }
+    });
 }
