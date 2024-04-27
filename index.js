@@ -84,7 +84,7 @@ proxyServer.on("connection", proxyConnection => {
             }
 
             // Get hostname
-            const [hostname] = headers["Host"]?.match(hostnameRegex) || [];
+            const [hostname] = (headers["Host"] || headers["host"])?.match(hostnameRegex) || [];
 
             // Find server
             if (!findServer(hostname)) {
@@ -102,7 +102,7 @@ proxyServer.on("connection", proxyConnection => {
                     return proxyConnection.destroy();
                 }
                 
-                const cookies = parseCookies(headers["Cookie"] || "");
+                const cookies = parseCookies(headers["Cookie"] || headers["cookie"] || "");
 
                 if (cookies[config.authorizationCookie] != foundServerOptions.authorizationPassword) {
                     // Incorrect or no authorization cookie
@@ -113,7 +113,10 @@ proxyServer.on("connection", proxyConnection => {
 
                 // Remove cookie before sending to server
                 delete cookies[config.authorizationCookie];
-                headers["Cookie"] = stringifyCookies(cookies);
+                if (headers["Cookie"])
+                    headers["Cookie"] = stringifyCookies(cookies); else
+                if (headers["cookie"])
+                    headers["cookie"] = stringifyCookies(cookies);
             }
 
             // Modify headers
@@ -219,8 +222,9 @@ function formatString(string, options) {
 function parseCookies(cookiesString) {
     return Object.fromEntries(cookiesString.split("; ").map(i => {
         const [name, value] = i.split("=");
+        if (!name) return null;
         return [name, value];
-    }));
+    }).filter(i => i));
 }
 
 function stringifyCookies(cookies) {
