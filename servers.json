@@ -3,9 +3,6 @@
         "proxyHostnames": ["localhost", "127.0.0.1"],
         "serverHostname": "example.com",
         "serverPort": 443,
-        "useTls": true,
-        "modifiedHeaders": {
-            "Host": "example.com"
-        }
+        "useTls": true
     }
 ]

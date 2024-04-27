@@ -10,6 +10,10 @@ fs.watchFile("config.json", () => config = readJson("config.json"));
 let servers = readJson("servers.json").filter(i => !i?.disabled);
 fs.watchFile("servers.json", () => servers = readJson("servers.json").filter(i => !i?.disabled));
 
+// Authorization HTML
+let authorizationHtml = formatString(fs.readFileSync("authorization.html", "utf-8"), { authorizationCookie: config.authorizationCookie });
+fs.watchFile("authorization.html", () => authorizationHtml = formatString(fs.readFileSync("authorization.html", "utf-8"), { authorizationCookie: config.authorizationCookie }));
+
 // Whitelist
 let whitelist;
 if (config.whitelist) {
@@ -26,7 +30,7 @@ if (config.blacklist) {
 
 // Regex
 const requestLineRegex = /^(.*) (.*) (HTTP\/\d*\.\d*)$/im; // GET /hello/world HTTP/1.1
-const statusLineRegex = /^(HTTP\/\d*\.\d*) (\d*) (.*)$/im; // HTTP/1.1 200 OK
+// const statusLineRegex = /^(HTTP\/\d*\.\d*) (\d*) (.*)$/im; // HTTP/1.1 200 OK
 const headersRegex = /^(.*?): ?(.*)$/m; // Host: localhost
 const hostnameRegex = /[^:]*/; // localhost (excludes port)
 
@@ -84,11 +88,33 @@ proxyServer.on("connection", proxyConnection => {
 
             // Find server
             if (!findServer(hostname)) {
-                logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} went to unknown hostname ${hostname}`);
+                logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach unknown hostname ${hostname}`);
                 return proxyConnection.destroy();
             }
 
             const foundServerOptions = { ...config.defaultServerOptions, ...findServer(hostname) }; // Get default server options + found server options
+
+            // Server requires authorization
+            if (foundServerOptions.authorization) {
+                if (!foundServerOptions.authorizationPassword) {
+                    // No authorization password set, destroy
+                    log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
+                    return proxyConnection.destroy();
+                }
+                
+                const cookies = parseCookies(headers["Cookie"] || "");
+
+                if (cookies[config.authorizationCookie] != foundServerOptions.authorizationPassword) {
+                    // Incorrect or no authorization cookie
+                    logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                    proxyConnection.write(`HTTP/1.1 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
+                    return;
+                };
+
+                // Remove cookie before sending to server
+                delete cookies[config.authorizationCookie];
+                headers["Cookie"] = stringifyCookies(cookies);
+            }
 
             // Modify headers
             Object.entries(foundServerOptions.modifiedHeaders || { }).forEach(([header, value]) => {
@@ -188,4 +214,15 @@ function formatString(string, options) {
     let formatted = string;
     Object.entries(options).forEach(([key, value]) => formatted = formatted.replace(new RegExp(`%{${key}}`, "g"), value));
     return formatted;
+}
+
+function parseCookies(cookiesString) {
+    return Object.fromEntries(cookiesString.split("; ").map(i => {
+        const [name, value] = i.split("=");
+        return [name, value];
+    }));
+}
+
+function stringifyCookies(cookies) {
+    return Object.entries(cookies).map(i => `${i[0]}=${i[1]}`).join("; ");
 }

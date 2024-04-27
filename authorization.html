@@ -1,0 +1,8 @@
+<script>
+    let authorization;
+    while (!authorization) {
+        authorization = prompt("Authorization required");
+    };
+    document.cookie = `%{authorizationCookie}=${authorization}`;
+    location.reload();
+</script>
