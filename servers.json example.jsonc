@@ -7,7 +7,15 @@
         "useTls": true, // Connect using TLS (HTTPS)
         "modifiedHeaders": { "Host": "example.com", "X-Forwarded-For": null }, // Remove or change HTTP headers, you will probably need to change the Host header to the server hostname and remove any proxy related headers
         "authorization": false, // If this server should require authorization before connecting
-        "authorizationPassword": null, // The password required to connect
-        "additionalServerOptions": { } // Additional options for when connecting to server
+        //"authorizationPassword": "password", // The password required to connect, do not set this to null, leave it undefined to use defaults
+        "additionalServerOptions": { }, // Additional options for when connecting to server, useful for stuff like SNI
+        "uriBypass": { // Bypass URI's and send custom data without connecting to server
+            "/robots.txt": {
+                "statusCode": 200, // Defaults to 200
+                "statusMessage": "OK", // NOTE: This does not default to "OK", "Forbidden", etc
+                "headers": { "Content-Type": "text/plain" }, // NOTE: Content-Length is set by default
+                "data": "User-agent: *\nDisallow: /"
+            }
+        }
     }
 ]

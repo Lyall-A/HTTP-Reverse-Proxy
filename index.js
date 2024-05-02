@@ -87,11 +87,11 @@ proxyServer.on("connection", proxyConnection => {
         const splitHeaders = rawHeaders.split("\r\n");
 
         const [requestLine, method, uri, version] = splitHeaders[0].match(requestLineRegex) || [];
-        if (requestLine) {            
+        if (requestLine) {
             const headers = getHeaders(splitHeaders); // Get headers
-            
+
             const realIp = config.realIpHeader ? headers[config.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
-            
+
             // Make sure using supported version
             if (config.supportedVersions && !config.supportedVersions.includes(version)) {
                 logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} using unsupported version ${version}`);
@@ -109,7 +109,7 @@ proxyServer.on("connection", proxyConnection => {
                 return proxyConnection.destroy();
             }
 
-            const foundServerOptions = objectDefaults(foundServer, config.defaultServerOptions || { }); // Get default server options + found server options
+            const foundServerOptions = objectDefaults(foundServer, config.defaultServerOptions || {}); // Get default server options + found server options
 
             // Server requires authorization
             if (foundServerOptions.authorization) {
@@ -118,23 +118,40 @@ proxyServer.on("connection", proxyConnection => {
                     log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
                     return proxyConnection.destroy();
                 }
-                
-                const cookies = parseCookies(getHeader(headers, "Cookie") || "");
 
-                if (cookies[config.authorizationCookie] != foundServerOptions.authorizationPassword) {
-                    // Incorrect or no authorization cookie
-                    logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
-                    proxyConnection.write(`HTTP/1.1 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
-                    return;
-                };
+                if (config.authorizationType == "cookies") {
+                    // Authorize using Cookies
+                    const cookies = parseCookies(getHeader(headers, "Cookie") || "");
 
-                // Remove cookie before sending to server
-                delete cookies[config.authorizationCookie];
-                setHeader(headers, "Cookie", stringifyCookies(cookies));
+                    if (cookies[config.authorizationCookie] != foundServerOptions.authorizationPassword) {
+                        // Incorrect or no authorization cookie
+                        logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                        proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
+                        return;
+                    };
+
+                    // Remove cookie before sending to server
+                    delete cookies[config.authorizationCookie];
+                    setHeader(headers, "Cookie", stringifyCookies(cookies));
+                } else if (config.authorizationType == "www-authenticate") {
+                    // Authorize using WWW-Authenticate header
+                    const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
+
+                    if (password != foundServerOptions.authorizationPassword) {
+                        // Incorrect or no WWW-Authorization header
+                        logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                        proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
+                        return;
+                    }
+                } else {
+                    // Unknown authorization type, destroy
+                    log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but an unknown authorization type was set`);
+                    return proxyConnection.destroy();
+                }
             }
 
             // Modify headers
-            Object.entries(foundServerOptions.modifiedHeaders || { }).forEach(([header, value]) => {
+            Object.entries(foundServerOptions.modifiedHeaders || {}).forEach(([header, value]) => {
                 if (value === true) return;
 
                 if (!value) {
@@ -146,6 +163,13 @@ proxyServer.on("connection", proxyConnection => {
                         serverPort: foundServerOptions.serverPort
                     }));
             });
+
+            // Is bypassed URI
+            const bypassOptions = foundServerOptions.uriBypass?.[uri];
+            if (bypassOptions) {
+                const bypassHeaders = objectDefaults(bypassOptions.headers, { "Content-Length": bypassOptions.data.length || 0 });
+                return proxyConnection.write(`${version} ${bypassOptions.statusCode || 200} ${bypassOptions.statusMessage || ""}\r\n${Object.entries(bypassHeaders).map(i => `${i[0]}: ${i[1]}`).join("\r\n")}\r\n\r\n${bypassOptions.data || ""}`);
+            }
 
             // Reconstruct data
             const reconstructedData = Buffer.concat([
@@ -225,8 +249,8 @@ function getHeaders(splitHeaders) {
 function findServer(hostname) {
     return servers.find(i => i?.proxyHostnames?.find(i =>
         i.startsWith(".") ? hostname.endsWith(i) :
-        i.endsWith(".") ? hostname.startsWith(i) :
-        hostname == i
+            i.endsWith(".") ? hostname.startsWith(i) :
+                hostname == i
     ));
 }
 
@@ -250,7 +274,7 @@ function stringifyCookies(cookies) {
 
 function objectDefaults(obj, def) {
     if (typeof obj != "object") return def;
-    
+
     return (function checkEntries(object = obj, defaultObj = def) {
         Object.entries(defaultObj).forEach(([key, value]) => {
             if (object[key] == undefined) object[key] = value;

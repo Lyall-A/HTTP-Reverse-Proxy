@@ -16,6 +16,7 @@
         
     },
     "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",
+    "authorizationType": "cookies",
     "defaultServerOptions": {
         "modifiedHeaders": {
             "Host": "%{serverHostname}:%{serverPort}",
@@ -25,6 +26,14 @@
             "CF-Visitor": null,
             "CF-RAY": null,
             "Origin": null
+        },
+        "uriBypass": {
+            "/robots.txt": {
+                "statusCode": 200,
+                "statusMessage": "OK",
+                "headers": { "Content-Type": "text/plain" },
+                "data": "User-agent: *\nDisallow: /"
+            }
         }
     }
 }
