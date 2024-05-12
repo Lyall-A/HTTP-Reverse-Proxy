@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400&display=swap" rel="stylesheet">
     <title>Proxy Authorization</title>
 </head>
-
 <body>
     <div id="container">
         <div id="form">
@@ -14,27 +12,23 @@
             <button onclick="authorize()">Authorize</button>
         </div>
     </div>
-
     <footer><a href="https://github.com/Lyall-A/HTTP-Reverse-Proxy">HTTP Reverse Proxy</a> on GitHub</footer>
-
     <script>
-        document.title = `${location.hostname} | Proxy Authorization`;
-
-        //document.getElementById("password").focus();
-
-        document.onkeydown = e => (e.keyCode == 13 && document.activeElement?.id == "password") ? authorize() : null;
+        document.title = `${location.hostname} | Proxy Authorization`; // Set title
+        document.getElementById("password").focus(); // Focus password input
+        document.onkeydown = e => (e.keyCode == 13 && document.activeElement?.id == "password") ? authorize() : null; // Set enter key to authorize
 
         function authorize() {
-            const password = document.getElementById("password");
+            const password = document.getElementById("password"); // Get password input
             if (!password.value) {
+                // No input
                 password.classList.add("badField");
                 return;
             }
-            document.cookie = `%{authorizationCookie}=${password.value}`;
-            location.reload();
+            document.cookie = `%{authorizationCookie}=${password.value}`; // Set authorization cookie
+            location.reload(); // Reload
         }
     </script>
-
     <style>
         :root {
             --bg: rgb(35, 34, 37);
@@ -42,16 +36,14 @@
             --grey: rgb(136, 136, 136);
             --white: rgb(221, 221, 221);
             --black: rgb(44, 44, 44);
+            --red: rgb(255, 50, 0);
         }
-
         * {
             font-family: "Roboto";
             text-decoration: none;
             text-align: center;
         }
-
         html, body { height: 100%; }
-
         body {
             padding: 0;
             margin: 0;
@@ -60,14 +52,12 @@
             flex-direction: column;
             background-color: var(--bg);
         }
-
         #container {
             display: flex;
             justify-content: center;
             flex-direction: column;
             flex-grow: 1;
         }
-        
         #form {
             display: flex;
             flex-direction: column;
@@ -75,18 +65,14 @@
             border-radius: 20px;
             padding: 50px;
         }
-
         #password { transition: border-color 0.2s ease }
-
-        .badField:not(:focus) { border-color: rgb(255, 51, 0) !important }
-
+        .badField:not(:focus) { border-color: var(--red) !important }
         footer {
             margin-top: auto;
             margin-bottom: 5px;
             margin-top: 5px;
             font-size: 1rem;
         }
-        
         button, input {
             border: 3px solid var(--grey);
             border-radius: 10px;
@@ -95,19 +81,15 @@
             font-size: 1.5rem;
             color: var(--black);
         }
-
         a {
             color: var(--lightgrey);
             transition: color 0.2s ease;
         }
-
         a:hover { color: var(--grey) }
-
         h1 {
             margin: 0;
             margin-bottom: 40px;
         }
-        
         h1, footer { color: var(--white) }
     </style>
 </body>
