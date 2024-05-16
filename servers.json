@@ -24,11 +24,20 @@
         "useTls": true
     },
     {
-        "proxyHostnames": ["custom-header.localhost", "127.0.0.1"],
+        "proxyHostnames": ["custom-header.localhost"],
         "serverHostname": "example.com",
         "serverPort": 443,
         "authorization": true,
         "authorizationType": "custom-header",
+        "authorizationPassword": "test",
+        "useTls": true
+    },
+    {
+        "proxyHostnames": ["custom-header-or-www-authenticate.localhost", "127.0.0.1"],
+        "serverHostname": "example.com",
+        "serverPort": 443,
+        "authorization": true,
+        "authorizationType": ["custom-header", "www-authenticate"],
         "authorizationPassword": "test",
         "useTls": true
     }

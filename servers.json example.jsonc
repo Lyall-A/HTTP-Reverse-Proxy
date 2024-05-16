@@ -11,7 +11,7 @@
         "proxyHostnames": ["localhost", "127.0.0.1"], // The hostnames to look for (start/end with period to match with ends/start with instead of exact match)
         "serverHostname": "example.com", // The hostname to connect to
         "serverPort": 443, // The port to connect to
-        "useTls": true, // Connect using TLS (HTTPS)
+        "useTls": true // Connect using TLS (HTTPS)
         // "authorization": false, // If this server should require authorization before connecting
         // "modifiedHeaders": { "Host": "example.com", "X-Forwarded-For": null }, // Remove or change HTTP headers, you will probably need to change the Host header to the server hostname and remove any proxy related headers
         // "additionalServerOptions": { }, // Additional options for when connecting to server, useful for stuff like SNI

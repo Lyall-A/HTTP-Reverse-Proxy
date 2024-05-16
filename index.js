@@ -137,55 +137,68 @@ proxyServer.on("connection", proxyConnection => {
                     return proxyConnection.destroy();
                 }
 
-                const authorizationType = serverOptions.authorizationType?.toLowerCase();
+                let authorized = false;
 
-                if (
-                    (typeof authorizationType == "string" && authorizationType == "cookies") ||
-                    (typeof authorizationType == "object" && authorizationType.includes("cookies")) ||
-                    (typeof authorizationType == "number" && authorizationType == 1)) {
-                    // Authorize using Cookies
-                    const cookies = parseCookies(getHeader(headers, "Cookie") || "");
-
-                    if (cookies[serverOptions.authorizationCookie] != serverOptions.authorizationPassword) {
-                        // Incorrect or no authorization cookie
-                        const authorizationHtml = serverOptions.authorizationCookie != config.defaultServerOptions.authorizationCookie ? formatString(defaultAuthorizationHtmlFile, { authorizationCookie: serverOptions.authorizationCookie }) : defaultAuthorizationHtml
-                        logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
-                        proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
-                        return;
-                    };
-
-                    // Remove cookie before sending to server
-                    delete cookies[serverOptions.authorizationCookie];
-                    setHeader(headers, "Cookie", stringifyCookies(cookies));
-                } else if (
-                    (typeof authorizationType == "string" && authorizationType == "www-authenticate") ||
-                    (typeof authorizationType == "object" && authorizationType.includes("www-authenticate")) ||
-                    (typeof authorizationType == "number" && authorizationType == 2)) {
-                    // Authorize using WWW-Authenticate header
-                    const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
-
-                    if (password != serverOptions.authorizationPassword) {
-                        // Incorrect or no WWW-Authorization header
-                        logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
-                        proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
-                        return;
-                    }
-                } else if (
-                    (typeof authorizationType == "string" && authorizationType == "custom-header") ||
-                    (typeof authorizationType == "object" && authorizationType.includes("custom-header")) ||
-                    (typeof authorizationType == "number" && authorizationType == 3)) {
-                    // Authorize using custom header
-                    const header = getHeader(headers, serverOptions.customAuthorizationHeader);
-
-                    if (header != serverOptions.authorizationPassword) {
-                        // Incorrect or no custom header
-                        logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
-                        proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
-                    }
+                if (typeof serverOptions.authorizationType == "object") {
+                    serverOptions.authorizationType.forEach((authorizationType, index, array) => {
+                        checkAuthorization(authorizationType.toLowerCase(), index == array.length - 1);
+                    });
                 } else {
-                    // Unknown authorization type, destroy
-                    log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but an unknown authorization type was set`);
-                    return proxyConnection.destroy();
+                    checkAuthorization(serverOptions.authorizationType?.toLowerCase(), true);
+                };
+
+                function checkAuthorization(authorizationType, isLastType) {
+                    if (authorized) return;
+
+                    if (authorizationType == "cookies") {
+                        // Authorize using Cookies
+                        const cookies = parseCookies(getHeader(headers, "Cookie") || "");
+
+                        if (cookies[serverOptions.authorizationCookie] != serverOptions.authorizationPassword) {
+                            // Incorrect or no authorization cookie
+                            if (!isLastType) return;
+                            const authorizationHtml = serverOptions.authorizationCookie != config.defaultServerOptions.authorizationCookie ? formatString(defaultAuthorizationHtmlFile, { authorizationCookie: serverOptions.authorizationCookie }) : defaultAuthorizationHtml
+                            logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                            proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
+                            return;
+                        };
+
+                        authorized = true;
+
+                        // Remove cookie before sending to server
+                        delete cookies[serverOptions.authorizationCookie];
+                        setHeader(headers, "Cookie", stringifyCookies(cookies));
+                    } else if (authorizationType == "www-authenticate") {
+                        // Authorize using WWW-Authenticate header
+                        const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
+
+                        if (password != serverOptions.authorizationPassword) {
+                            // Incorrect or no WWW-Authorization header
+                            if (!isLastType) return;
+                            logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                            proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
+                            return;
+                        }
+
+                        authorized = true;
+                    } else if (authorizationType == "custom-header") {
+                        // Authorize using custom header
+                        const header = getHeader(headers, serverOptions.customAuthorizationHeader);
+
+                        if (header != serverOptions.authorizationPassword) {
+                            // Incorrect or no custom header
+                            if (!isLastType) return;
+                            logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                            proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
+                            return;
+                        }
+
+                        authorized = true;
+                    } else {
+                        // Unknown authorization type, destroy
+                        log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but an unknown authorization type was set`);
+                        return proxyConnection.destroy();
+                    }
                 }
             }
 
@@ -219,7 +232,7 @@ proxyServer.on("connection", proxyConnection => {
                 Buffer.from(rawData)
             ]);
 
-            console.log(reconstructedData.toString());
+            // console.log(reconstructedData.toString());
 
             if (!serverConnection || serverConnection.ended) {
                 // Connect to server
