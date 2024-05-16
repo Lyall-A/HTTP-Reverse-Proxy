@@ -16,30 +16,32 @@ watch("servers.json", true, file => {
     console.log("Updated servers");
 });
 
-// Authorization HTML
-let authorizationHtml = formatString(fs.readFileSync("authorization.html", "utf-8"), { authorizationCookie: config.authorizationCookie });
+// Default authorization HTML
+let defaultAuthorizationHtmlFile = fs.readFileSync("authorization.html", "utf-8");
+let defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { authorizationCookie: config.defaultServerOptions.authorizationCookie });
 watch("authorization.html", false, file => {
-    authorizationHtml = formatString(file, { authorizationCookie: config.authorizationCookie });
+    defaultAuthorizationHtmlFile = file;
+    defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { authorizationCookie: config.defaultServerOptions.authorizationCookie });
     console.log("Updated authorization HTML");
 });
 
-// Whitelist
-let whitelist;
-if (config.whitelist) {
-    whitelist = readJson(config.whitelist);
-    watch(config.whitelist, true, file => {
-        whitelist = file;
-        console.log("Updated whitelist");
+// Default whitelist
+let defaultWhitelist;
+if (config.defaultServerOptions.whitelist) {
+    whitelist = readJson(config.defaultServerOptions.whitelist);
+    watch(config.defaultServerOptions.whitelist, true, file => {
+        defaultWhitelist = file;
+        console.log("Updated default whitelist");
     });
 }
 
-// Blacklist
-let blacklist;
-if (config.blacklist) {
-    blacklist = readJson(config.blacklist);
-    watch(config.blacklist, true, file => {
-        blacklist = file;
-        console.log("Updated blacklist");
+// Default blacklist
+let defaultBlacklist;
+if (config.defaultServerOptions.blacklist) {
+    defaultBlacklist = readJson(config.defaultServerOptions.blacklist);
+    watch(config.defaultServerOptions.blacklist, true, file => {
+        defaultBlacklist = file;
+        console.log("Updated default blacklist");
     });
 }
 
@@ -50,8 +52,8 @@ const headersRegex = /^(.*?): ?(.*)$/m; // Host: localhost
 const hostnameRegex = /[^:]*/; // localhost (excludes port)
 
 // Log
-if (whitelist) log(`\nWhitelist: ${whitelist.length}\n${whitelist.join("\n")}`);
-if (blacklist) log(`\nBlacklist: ${blacklist.length}\n${blacklist.join("\n")}`);
+if (defaultWhitelist) log(`\nDefault whitelist: ${defaultWhitelist.length}\n${defaultWhitelist.join("\n")}`);
+if (defaultBlacklist) log(`\nDefault blacklist: ${defaultBlacklist.length}\n${defaultBlacklist.join("\n")}`);
 log(`\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}`);
 log();
 
@@ -67,13 +69,13 @@ proxyServer.on("connection", proxyConnection => {
     // Get IP
     const ip = proxyConnection.remoteAddress.split("::ffff:")[1] || proxyConnection.remoteAddress;
 
-    // Whitelist
-    if (whitelist && !ipMatch(ip, whitelist)) {
+    // Default whitelist
+    if (defaultWhitelist && !ipMatch(ip, defaultWhitelist)) {
         log(`Unwhitelisted IP ${ip} attempted to connect!`);
         return proxyConnection.destroy();
     }
-    // Blacklist
-    if (blacklist && ipMatch(ip, blacklist)) {
+    // Default blacklist
+    if (defaultBlacklist && ipMatch(ip, defaultBlacklist)) {
         log(`Blacklisted IP ${ip} attempted to connect!`);
         return proxyConnection.destroy();
     }
@@ -83,6 +85,7 @@ proxyServer.on("connection", proxyConnection => {
     let serverConnection;
 
     proxyConnection.on("data", data => {
+        // Proxy server on data
         const [rawHeaders, rawData = ""] = data.toString().split("\r\n\r\n");
         const splitHeaders = rawHeaders.split("\r\n");
 
@@ -90,7 +93,7 @@ proxyServer.on("connection", proxyConnection => {
         if (requestLine) {
             const headers = getHeaders(splitHeaders); // Get headers
 
-            const realIp = config.realIpHeader ? headers[config.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
+            let realIp = config.defaultServerOptions.realIpHeader ? headers[config.defaultServerOptions.realIpHeader] : null; // Get real IP using default realIpHeader config (if using some sort of proxy like Cloudflare)
 
             // Make sure using supported version
             if (config.supportedVersions && !config.supportedVersions.includes(version)) {
@@ -101,47 +104,83 @@ proxyServer.on("connection", proxyConnection => {
             // Get hostname
             const [hostname] = getHeader(headers, "Host")?.match(hostnameRegex) || [];
 
-            const foundServer = findServer(hostname);
+            const server = findServer(hostname);
 
             // Find server
-            if (!foundServer) {
+            if (!server) {
                 logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach unknown hostname ${hostname}`);
                 return proxyConnection.destroy();
             }
 
-            const foundServerOptions = objectDefaults(foundServer, config.defaultServerOptions || {}); // Get default server options + found server options
+            const serverOptions = objectDefaults(server, config.defaultServerOptions || {}); // Get default server options + found server options
+
+            // Whitelist
+            const whitelist = serverOptions.whitelist != config.defaultServerOptions.whitelist ? readJson(serverOptions.whitelist) : null;
+            if (whitelist && !ipMatch(ip, whitelist)) {
+                log(`Unwhitelisted IP ${ip} attempted to connect!`);
+                return proxyConnection.destroy();
+            }
+            // Blacklist
+            const blacklist = serverOptions.blacklist != config.defaultServerOptions.blacklist ? readJson(serverOptions.blacklist) : null;
+            if (blacklist && ipMatch(ip, blacklist)) {
+                log(`Blacklisted IP ${ip} attempted to connect!`);
+                return proxyConnection.destroy();
+            }
+
+            realIp = serverOptions.realIpHeader ? headers[serverOptions.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
 
             // Server requires authorization
-            if (foundServerOptions.authorization) {
-                if (!foundServerOptions.authorizationPassword) {
+            if (serverOptions.authorization) {
+                if (!serverOptions.authorizationPassword) {
                     // No authorization password set, destroy
                     log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
                     return proxyConnection.destroy();
                 }
 
-                if (config.authorizationType == "cookies") {
+                const authorizationType = serverOptions.authorizationType?.toLowerCase();
+
+                if (
+                    (typeof authorizationType == "string" && authorizationType == "cookies") ||
+                    (typeof authorizationType == "object" && authorizationType.includes("cookies")) ||
+                    (typeof authorizationType == "number" && authorizationType == 1)) {
                     // Authorize using Cookies
                     const cookies = parseCookies(getHeader(headers, "Cookie") || "");
 
-                    if (cookies[config.authorizationCookie] != foundServerOptions.authorizationPassword) {
+                    if (cookies[serverOptions.authorizationCookie] != serverOptions.authorizationPassword) {
                         // Incorrect or no authorization cookie
+                        const authorizationHtml = serverOptions.authorizationCookie != config.defaultServerOptions.authorizationCookie ? formatString(defaultAuthorizationHtmlFile, { authorizationCookie: serverOptions.authorizationCookie }) : defaultAuthorizationHtml
                         logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
                         proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
                         return;
                     };
 
                     // Remove cookie before sending to server
-                    delete cookies[config.authorizationCookie];
+                    delete cookies[serverOptions.authorizationCookie];
                     setHeader(headers, "Cookie", stringifyCookies(cookies));
-                } else if (config.authorizationType == "www-authenticate") {
+                } else if (
+                    (typeof authorizationType == "string" && authorizationType == "www-authenticate") ||
+                    (typeof authorizationType == "object" && authorizationType.includes("www-authenticate")) ||
+                    (typeof authorizationType == "number" && authorizationType == 2)) {
                     // Authorize using WWW-Authenticate header
                     const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
 
-                    if (password != foundServerOptions.authorizationPassword) {
+                    if (password != serverOptions.authorizationPassword) {
                         // Incorrect or no WWW-Authorization header
                         logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
                         proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
                         return;
+                    }
+                } else if (
+                    (typeof authorizationType == "string" && authorizationType == "custom-header") ||
+                    (typeof authorizationType == "object" && authorizationType.includes("custom-header")) ||
+                    (typeof authorizationType == "number" && authorizationType == 3)) {
+                    // Authorize using custom header
+                    const header = getHeader(headers, serverOptions.customAuthorizationHeader);
+
+                    if (header != serverOptions.authorizationPassword) {
+                        // Incorrect or no custom header
+                        logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                        proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
                     }
                 } else {
                     // Unknown authorization type, destroy
@@ -151,7 +190,7 @@ proxyServer.on("connection", proxyConnection => {
             }
 
             // Modify headers
-            Object.entries(foundServerOptions.modifiedHeaders || {}).forEach(([header, value]) => {
+            Object.entries(serverOptions.modifiedHeaders || {}).forEach(([header, value]) => {
                 if (value === true) return;
 
                 if (!value) {
@@ -159,13 +198,13 @@ proxyServer.on("connection", proxyConnection => {
                 } else
                     setHeader(headers, header, formatString(value, {
                         proxyHostname: hostname,
-                        serverHostname: foundServerOptions.serverHostname,
-                        serverPort: foundServerOptions.serverPort
+                        serverHostname: serverOptions.serverHostname,
+                        serverPort: serverOptions.serverPort
                     }));
             });
 
             // Is bypassed URI
-            const bypassOptions = foundServerOptions.uriBypass?.[uri];
+            const bypassOptions = serverOptions.uriBypass?.[uri];
             if (bypassOptions) {
                 const bypassHeaders = objectDefaults(bypassOptions.headers, { "Content-Length": bypassOptions.data.length || 0 });
                 return proxyConnection.write(`${version} ${bypassOptions.statusCode || 200} ${bypassOptions.statusMessage || ""}\r\n${Object.entries(bypassHeaders).map(i => `${i[0]}: ${i[1]}`).join("\r\n")}\r\n\r\n${bypassOptions.data || ""}`);
@@ -180,15 +219,15 @@ proxyServer.on("connection", proxyConnection => {
                 Buffer.from(rawData)
             ]);
 
-            // console.log(reconstructedData.toString());
+            console.log(reconstructedData.toString());
 
             if (!serverConnection || serverConnection.ended) {
                 // Connect to server
-                serverConnection = (foundServerOptions.useTls ? tls : net).connect({
-                    host: foundServerOptions.serverHostname,
-                    port: foundServerOptions.serverPort,
+                serverConnection = (serverOptions.useTls ? tls : net).connect({
+                    host: serverOptions.serverHostname,
+                    port: serverOptions.serverPort,
                     rejectUnauthorized: false,
-                    ...foundServerOptions.additionalServerOptions
+                    ...serverOptions.additionalServerOptions
                 });
 
                 serverConnection.on("data", i => { if (!proxyConnection.ended) proxyConnection.write(i) });

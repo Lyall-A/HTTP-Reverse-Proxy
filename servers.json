@@ -1,8 +1,35 @@
 [
     {
-        "proxyHostnames": ["localhost", "127.0.0.1"],
+        "proxyHostnames": ["localhost"],
         "serverHostname": "example.com",
         "serverPort": 443,
+        "useTls": true
+    },
+    {
+        "proxyHostnames": ["cookies.localhost"],
+        "serverHostname": "example.com",
+        "serverPort": 443,
+        "authorization": true,
+        "authorizationType": "cookies",
+        "authorizationPassword": "test",
+        "useTls": true
+    },
+    {
+        "proxyHostnames": ["www-authenticate.localhost"],
+        "serverHostname": "example.com",
+        "serverPort": 443,
+        "authorization": true,
+        "authorizationType": "www-authenticate",
+        "authorizationPassword": "test",
+        "useTls": true
+    },
+    {
+        "proxyHostnames": ["custom-header.localhost", "127.0.0.1"],
+        "serverHostname": "example.com",
+        "serverPort": 443,
+        "authorization": true,
+        "authorizationType": "custom-header",
+        "authorizationPassword": "test",
         "useTls": true
     }
 ]

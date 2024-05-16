@@ -6,18 +6,19 @@
     "tls": false,
     "key": null,
     "cert": null,
-    "whitelist": "whitelist.json",
-    "blacklist": null,
-    "realIpHeader": "CF-Connecting-IP",
-    "supportedVersions": [
-        "HTTP/1.1"
-    ],
     "additionalProxyServerOptions": {
         
     },
-    "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",
-    "authorizationType": "cookies",
+    "supportedVersions": [
+        "HTTP/1.1"
+    ],
     "defaultServerOptions": {
+        "whitelist": "whitelist.json",
+        "blacklist": null,
+        "realIpHeader": "CF-Connecting-IP",
+        "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",
+        "customAuthorizationHeader": "X-HTTP-Reverse-Proxy-Authorization",
+        "authorizationType": "cookies",
         "modifiedHeaders": {
             "Host": "%{serverHostname}:%{serverPort}",
             "X-Forwarded-For": null,

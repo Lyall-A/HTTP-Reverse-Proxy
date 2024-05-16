@@ -6,7 +6,8 @@ A proxy that routes requests based on the host header (eg. `plex.yourdomain.com`
 
 Pre-configured to work behind Cloudflare proxy and disallow robots
 
-## Features:
-* Authorization using Cookies or WWW-Authenticate header
+## Features
+* Authorization using Cookies, WWW-Authenticate header or a custom header
 * IP range whitelist and blacklist
 * URI bypass
+* Each server can have different configurations
