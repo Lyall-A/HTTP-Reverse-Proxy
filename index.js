@@ -245,7 +245,7 @@ proxyServer.on("connection", proxyConnection => {
 
                 serverConnection.on("data", i => { if (!proxyConnection.ended) proxyConnection.write(i) });
                 serverConnection.on("close", i => { if (!proxyConnection.ended) proxyConnection.end() });
-                serverConnection.on("error", err => console.error("Server error:", err)); // This is usually fine
+                serverConnection.on("error", err => logError("Server error:", err)); // This is usually fine
             }
 
             if (serverConnection && !serverConnection.ended) serverConnection.write(reconstructedData);
@@ -254,7 +254,7 @@ proxyServer.on("connection", proxyConnection => {
     });
 
     proxyConnection.on("close", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
-    proxyConnection.on("error", err => console.error("Proxy error:", err)); // This is usually fine
+    proxyConnection.on("error", err => logError("Proxy error:", err)); // This is usually fine
 });
 
 // Listen
@@ -265,11 +265,15 @@ function readJson(filePath) {
 }
 
 function log(...msg) {
-    if (config.logging) console.log(...msg);
+    if (config.logging) console.log(`[${new Date().toUTCString()}]`, ...msg);
 }
 
 function logAdditional(...msg) {
-    if (config.additionalLogging) console.log(...msg);
+    if (config.additionalLogging) console.log(`[${new Date().toUTCString()}]`, ...msg);
+}
+
+function logError(err, ...msg) {
+    if (!config.ignoreErrors) console.error(`[${new Date().toUTCString()}]`, ...msg, err);
 }
 
 function ipMatch(ip, matches) {
@@ -342,7 +346,7 @@ function watch(file, json, callback) {
         try {
             callback(readJson(file));
         } catch (err) {
-            console.error(`Failed to read ${file}, error:`, err);
+            logError(`Failed to read ${file}, error:`, err);
         }
     });
 }
