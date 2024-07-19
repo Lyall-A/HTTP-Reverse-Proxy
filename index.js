@@ -54,8 +54,8 @@ const hostnameRegex = /[^:]*/; // localhost (excludes port)
 // Log
 if (defaultWhitelist) log(`\nDefault whitelist: ${defaultWhitelist.length}\n${defaultWhitelist.join("\n")}`);
 if (defaultBlacklist) log(`\nDefault blacklist: ${defaultBlacklist.length}\n${defaultBlacklist.join("\n")}`);
-log(`\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}`);
-log();
+log(0, `\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}`);
+log(0, "");
 
 // Create proxy server
 const proxyServer = (config.tls ? tls : net).createServer({
@@ -67,20 +67,21 @@ const proxyServer = (config.tls ? tls : net).createServer({
 // Proxy server on connection
 proxyServer.on("connection", proxyConnection => {
     // Get IP
-    const ip = proxyConnection.remoteAddress.split("::ffff:")[1] || proxyConnection.remoteAddress;
+    const ip = proxyConnection.remoteAddress?.split("::ffff:")[1] || proxyConnection.remoteAddress;
+    if (!ip) return; // Why does this happen sometimes?
 
     // Default whitelist
     if (defaultWhitelist && !ipMatch(ip, defaultWhitelist)) {
-        log(`Unwhitelisted IP ${ip} attempted to connect!`);
+        log(1, `Unwhitelisted IP ${ip} attempted to connect!`);
         return proxyConnection.destroy();
     }
     // Default blacklist
     if (defaultBlacklist && ipMatch(ip, defaultBlacklist)) {
-        log(`Blacklisted IP ${ip} attempted to connect!`);
+        log(1, `Blacklisted IP ${ip} attempted to connect!`);
         return proxyConnection.destroy();
     }
 
-    logAdditional(`New connection from ${ip}`);
+    log(3, `New connection from ${ip}`);
 
     let serverConnection;
 
@@ -97,7 +98,7 @@ proxyServer.on("connection", proxyConnection => {
 
             // Make sure using supported version
             if (config.supportedVersions && !config.supportedVersions.includes(version)) {
-                logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} using unsupported version ${version}`);
+                log(2, `IP ${ip}${realIp ? ` (${realIp})` : ""} using unsupported version ${version}`);
                 return proxyConnection.destroy();
             }
 
@@ -108,22 +109,23 @@ proxyServer.on("connection", proxyConnection => {
 
             // Find server
             if (!server) {
-                logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach unknown hostname ${hostname}`);
+                log(2, `IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach unknown hostname ${hostname}`);
                 return proxyConnection.destroy();
             }
 
             const serverOptions = objectDefaults(server, config.defaultServerOptions || {}); // Get default server options + found server options
 
+            // Check whitelist/blacklist again with custom options
             // Whitelist
             const whitelist = serverOptions.whitelist != config.defaultServerOptions.whitelist ? readJson(serverOptions.whitelist) : null;
             if (whitelist && !ipMatch(ip, whitelist)) {
-                log(`Unwhitelisted IP ${ip} attempted to connect!`);
+                log(1, `Unwhitelisted IP ${ip} attempted to connect!`);
                 return proxyConnection.destroy();
             }
             // Blacklist
             const blacklist = serverOptions.blacklist != config.defaultServerOptions.blacklist ? readJson(serverOptions.blacklist) : null;
             if (blacklist && ipMatch(ip, blacklist)) {
-                log(`Blacklisted IP ${ip} attempted to connect!`);
+                log(1, `Blacklisted IP ${ip} attempted to connect!`);
                 return proxyConnection.destroy();
             }
 
@@ -133,7 +135,7 @@ proxyServer.on("connection", proxyConnection => {
             if (serverOptions.authorization) {
                 if (!serverOptions.authorizationPassword) {
                     // No authorization password set, destroy
-                    log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
+                    log(1, `IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
                     return proxyConnection.destroy();
                 }
 
@@ -158,7 +160,7 @@ proxyServer.on("connection", proxyConnection => {
                             // Incorrect or no authorization cookie
                             if (!isLastType) return;
                             const authorizationHtml = serverOptions.authorizationCookie != config.defaultServerOptions.authorizationCookie ? formatString(defaultAuthorizationHtmlFile, { authorizationCookie: serverOptions.authorizationCookie }) : defaultAuthorizationHtml
-                            logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                            log(2, `IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
                             proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
                             return;
                         };
@@ -175,7 +177,7 @@ proxyServer.on("connection", proxyConnection => {
                         if (password != serverOptions.authorizationPassword) {
                             // Incorrect or no WWW-Authorization header
                             if (!isLastType) return;
-                            logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                            log(2, `IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
                             proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
                             return;
                         }
@@ -188,7 +190,7 @@ proxyServer.on("connection", proxyConnection => {
                         if (header != serverOptions.authorizationPassword) {
                             // Incorrect or no custom header
                             if (!isLastType) return;
-                            logAdditional(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
+                            log(2, `IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization`);
                             proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
                             return;
                         }
@@ -196,7 +198,7 @@ proxyServer.on("connection", proxyConnection => {
                         authorized = true;
                     } else {
                         // Unknown authorization type, destroy
-                        log(`IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but an unknown authorization type was set`);
+                        log(1, `IP ${ip}${realIp ? ` (${realIp})` : ""} tried to reach ${hostname} which requires authorization, but an unknown authorization type was set`);
                         return proxyConnection.destroy();
                     }
                 }
@@ -245,7 +247,7 @@ proxyServer.on("connection", proxyConnection => {
 
                 serverConnection.on("data", i => { if (!proxyConnection.ended) proxyConnection.write(i) });
                 serverConnection.on("close", i => { if (!proxyConnection.ended) proxyConnection.end() });
-                serverConnection.on("error", err => logError("Server error:", err)); // This is usually fine
+                serverConnection.on("error", err => logServerError(err)); // This is usually fine
             }
 
             if (serverConnection && !serverConnection.ended) serverConnection.write(reconstructedData);
@@ -254,7 +256,7 @@ proxyServer.on("connection", proxyConnection => {
     });
 
     proxyConnection.on("close", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
-    proxyConnection.on("error", err => logError("Proxy error:", err)); // This is usually fine
+    proxyConnection.on("error", err => logProxyError(err)); // This is usually fine
 });
 
 // Listen
@@ -264,16 +266,16 @@ function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
 
-function log(...msg) {
-    if (config.logging) console.log(`[${new Date().toUTCString()}]`, ...msg);
+function log(level, ...msg) {
+    if (config.loggingLevel >= level) console.log(`[${new Date().toUTCString()}]`, ...msg);
 }
 
-function logAdditional(...msg) {
-    if (config.additionalLogging) console.log(`[${new Date().toUTCString()}]`, ...msg);
+function logProxyError(err) {
+    if (!config.ignoreErrors && !config.ignoreProxyErrors) console.error(`[${new Date().toUTCString()}]`, err);
 }
 
-function logError(err, ...msg) {
-    if (!config.ignoreErrors) console.error(`[${new Date().toUTCString()}]`, ...msg, err);
+function logServerError(err) {
+    if (!config.ignoreErrors && !config.ignoreServerErrors) console.error(`[${new Date().toUTCString()}]`, err);
 }
 
 function ipMatch(ip, matches) {
@@ -303,6 +305,7 @@ function getHeaders(splitHeaders) {
 }
 
 function findServer(hostname) {
+    if (typeof hostname != "string") return null;
     return servers.find(i => i?.proxyHostnames?.find(i =>
         i.startsWith(".") ? hostname.endsWith(i) :
             i.endsWith(".") ? hostname.startsWith(i) :
@@ -346,7 +349,7 @@ function watch(file, json, callback) {
         try {
             callback(readJson(file));
         } catch (err) {
-            logError(`Failed to read ${file}, error:`, err);
+            console.error(`Failed to read ${file}, error:`, err);
         }
     });
 }

@@ -1,8 +1,8 @@
 {
     "port": 80,
     "hostname": null,
-    "logging": true,
-    "additionalLogging": false,
+    "loggingLevel": 2,
+    "ignoreErrors": true,
     "tls": false,
     "key": null,
     "cert": null,
