@@ -84,6 +84,11 @@ proxyServer.on("connection", proxyConnection => {
 
     let serverConnection;
 
+    let proxyQueue = [];
+    let proxySending = false;
+    let serverQueue = [];
+    let serverSending = false;
+
     proxyConnection.on("data", data => {
         // Proxy server on data
         const [rawHeaders, rawData = ""] = data.toString().split("\r\n\r\n");
@@ -244,20 +249,89 @@ proxyServer.on("connection", proxyConnection => {
                     ...serverOptions.additionalServerOptions
                 });
 
-                serverConnection.on("data", i => { if (!proxyConnection.ended) proxyConnection.write(i) });
-                // serverConnection.on("close", i => { if (!proxyConnection.ended) proxyConnection.end() });
-                serverConnection.on("end", i => { if (!proxyConnection.ended) proxyConnection.end() });
-                serverConnection.on("error", err => logServerError(err)); // This is usually fine
+                serverConnection.on("data", i => writeProxyConnection(i));
+                serverConnection.on("close", i => closeAll());
+                serverConnection.on("end", i => closeAll());
+                serverConnection.on("error", err => {
+                    closeAll();
+                    logServerError(err);
+                });
             }
 
-            if (serverConnection && !serverConnection.ended) serverConnection.write(reconstructedData);
+            writeServerConnection(reconstructedData);
         } else
-            if (serverConnection && !serverConnection.ended) serverConnection.write(data);
+            writeServerConnection(data);
     });
 
-    // proxyConnection.on("close", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
-    proxyConnection.on("end", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
-    proxyConnection.on("error", err => logProxyError(err)); // This is usually fine
+    proxyConnection.on("close", i => closeAll());
+    proxyConnection.on("end", i => closeAll());
+    proxyConnection.on("error", err => {
+        closeAll();
+        logProxyError(err);
+    });
+
+    function closeAll() {
+        closeServerConnection();
+        closeProxyConnection();
+    }
+
+    function closeServerConnection() {
+        if (serverConnection && !serverConnection.ended && !proxyConnection.destroyed) serverConnection.destroy();
+        serverQueue = [];
+    }
+
+    function closeProxyConnection() {
+        if (proxyConnection && !proxyConnection.ended && !proxyConnection.destroyed) proxyConnection.destroy();
+        proxyQueue = [];
+    }
+
+    function writeServerConnection(data) {
+        if (serverConnection && !serverConnection.ended && !serverConnection.destroyed) serverConnection.write(data);
+        // if (serverConnection && !serverConnection.ended && !serverConnection.destroyed) {
+        //     if (data !== true) {
+        //         serverQueue.push(data);
+        //     }
+
+        //     if (serverSending || !serverQueue.length) return;
+            
+        //     serverSending = true;
+        //     data = serverQueue.shift();
+
+        //     if (!serverConnection.write(data)) {
+        //         serverConnection.once("drain", () => {
+        //             serverSending = false;
+        //             writeServerConnection(true);
+        //         });
+        //     } else {
+        //         serverSending = false;
+        //         writeServerConnection(true);
+        //     }
+        // }
+    }
+
+    function writeProxyConnection(data) {
+        if (proxyConnection && !proxyConnection.ended && !proxyConnection.destroyed) proxyConnection.write(data);
+        // if (proxyConnection && !proxyConnection.ended && !proxyConnection.destroyed) {
+        //     if (data !== true) {
+        //         proxyQueue.push(data);
+        //     }
+
+        //     if (proxySending || !proxyQueue.length) return;
+            
+        //     proxySending = true;
+        //     data = proxyQueue.shift();
+
+        //     if (!proxyConnection.write(data)) {
+        //         proxyConnection.once("drain", () => {
+        //             proxySending = false;
+        //             writeProxyConnection(true);
+        //         });
+        //     } else {
+        //         proxySending = false;
+        //         writeProxyConnection(true);
+        //     }
+        // }
+    }
 });
 
 // Listen
@@ -272,11 +346,11 @@ function log(level, ...msg) {
 }
 
 function logProxyError(err) {
-    if (!config.ignoreErrors && !config.ignoreProxyErrors) console.error(`[${new Date().toUTCString()}]`, err);
+    if (!config.ignoreErrors && !config.ignoreProxyErrors) console.error(`[${new Date().toUTCString()}]`, "[PROXY ERROR]", err);
 }
 
 function logServerError(err) {
-    if (!config.ignoreErrors && !config.ignoreServerErrors) console.error(`[${new Date().toUTCString()}]`, err);
+    if (!config.ignoreErrors && !config.ignoreServerErrors) console.error(`[${new Date().toUTCString()}]`, "[SERVER ERROR]", err);
 }
 
 function ipMatch(ip, matches) {
