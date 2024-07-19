@@ -245,7 +245,8 @@ proxyServer.on("connection", proxyConnection => {
                 });
 
                 serverConnection.on("data", i => { if (!proxyConnection.ended) proxyConnection.write(i) });
-                serverConnection.on("close", i => { if (!proxyConnection.ended) proxyConnection.end() });
+                // serverConnection.on("close", i => { if (!proxyConnection.ended) proxyConnection.end() });
+                serverConnection.on("end", i => { if (!proxyConnection.ended) proxyConnection.end() });
                 serverConnection.on("error", err => logServerError(err)); // This is usually fine
             }
 
@@ -254,7 +255,8 @@ proxyServer.on("connection", proxyConnection => {
             if (serverConnection && !serverConnection.ended) serverConnection.write(data);
     });
 
-    proxyConnection.on("close", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
+    // proxyConnection.on("close", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
+    proxyConnection.on("end", () => { if (serverConnection && !serverConnection.ended) serverConnection.end() });
     proxyConnection.on("error", err => logProxyError(err)); // This is usually fine
 });
 
