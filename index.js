@@ -6,14 +6,14 @@ const fs = require("fs");
 let config = readJson("config.json");
 watch("config.json", true, file => {
     config = file;
-    console.log("Updated config");
+    log(0, "Updated config");
 });
 
 // Servers
 let servers = readJson("servers.json").filter(i => !i?.disabled);
 watch("servers.json", true, file => {
     servers = file.filter(i => !i?.disabled);
-    console.log("Updated servers");
+    log(0, "Updated servers");
 });
 
 // Default authorization HTML
@@ -22,7 +22,7 @@ let defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { auth
 watch("authorization.html", false, file => {
     defaultAuthorizationHtmlFile = file;
     defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { authorizationCookie: config.defaultServerOptions.authorizationCookie });
-    console.log("Updated authorization HTML");
+    log(0, "Updated authorization HTML");
 });
 
 // Default whitelist
@@ -31,7 +31,7 @@ if (config.defaultServerOptions.whitelist) {
     whitelist = readJson(config.defaultServerOptions.whitelist);
     watch(config.defaultServerOptions.whitelist, true, file => {
         defaultWhitelist = file;
-        console.log("Updated default whitelist");
+        log(0, "Updated default whitelist");
     });
 }
 
@@ -41,7 +41,7 @@ if (config.defaultServerOptions.blacklist) {
     defaultBlacklist = readJson(config.defaultServerOptions.blacklist);
     watch(config.defaultServerOptions.blacklist, true, file => {
         defaultBlacklist = file;
-        console.log("Updated default blacklist");
+        log(0, "Updated default blacklist");
     });
 }
 
@@ -52,8 +52,8 @@ const headersRegex = /^(.*?): ?(.*)$/m; // Host: localhost
 const hostnameRegex = /[^:]*/; // localhost (excludes port)
 
 // Log
-if (defaultWhitelist) log(`\nDefault whitelist: ${defaultWhitelist.length}\n${defaultWhitelist.join("\n")}`);
-if (defaultBlacklist) log(`\nDefault blacklist: ${defaultBlacklist.length}\n${defaultBlacklist.join("\n")}`);
+if (defaultWhitelist) log(0, `\nDefault whitelist: ${defaultWhitelist.length}\n${defaultWhitelist.join("\n")}`);
+if (defaultBlacklist) log(0, `\nDefault blacklist: ${defaultBlacklist.length}\n${defaultBlacklist.join("\n")}`);
 log(0, `\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}`);
 log(0, "");
 
@@ -260,7 +260,7 @@ proxyServer.on("connection", proxyConnection => {
 });
 
 // Listen
-proxyServer.listen(config.port, config.hostname, () => log(`Listening at :${config.port}`))
+proxyServer.listen(config.port, config.hostname, () => log(1, `Listening at :${config.port}`));
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, "utf-8"));
