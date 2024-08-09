@@ -54,7 +54,7 @@ const hostnameRegex = /[^:]*/; // localhost (excludes port)
 // Log
 if (defaultWhitelist) log(0, `\nDefault whitelist: ${defaultWhitelist.length}\n${defaultWhitelist.join("\n")}`);
 if (defaultBlacklist) log(0, `\nDefault blacklist: ${defaultBlacklist.length}\n${defaultBlacklist.join("\n")}`);
-log(0, `\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}\n`);
+log(0, `\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.redirect || i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`).join("\n")}\n`);
 
 // Create proxy server
 const proxyServer = (config.tls ? tls : net).createServer({
