@@ -208,6 +208,11 @@ proxyServer.on("connection", proxyConnection => {
                 }
             }
 
+            // Is redirect
+            if (serverOptions.redirect) {
+                return proxyConnection.write(`${version} 301 Moved Permanently\r\nLocation: ${serverOptions.redirect}\r\n\r\n`);
+            }
+
             // Modify headers
             Object.entries(serverOptions.modifiedHeaders || {}).forEach(([header, value]) => {
                 if (value === true) return;
@@ -221,11 +226,6 @@ proxyServer.on("connection", proxyConnection => {
                         serverPort: serverOptions.serverPort
                     }));
             });
-
-            // Is redirect
-            if (serverOptions.redirect) {
-                return proxyConnection.write(`${version} 301 Moved Permanently\r\nLocation: ${serverOptions.redirect}\r\n\r\n`);
-            }
 
             // Is bypassed URI
             const bypassOptions = serverOptions.uriBypass?.[uri];
