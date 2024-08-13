@@ -19,6 +19,7 @@
         "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",
         "customAuthorizationHeader": "X-HTTP-Reverse-Proxy-Authorization",
         "authorizationType": "cookies",
+        "cookieExpiry": 86400000,
         "modifiedHeaders": {
             "Host": "%{serverOptions.serverHostname}:%{serverOptions.serverPort}",
             "X-Forwarded-Proto": null,

@@ -20,6 +20,7 @@
         "customAuthorizationHeader": "X-HTTP-Reverse-Proxy-Authorization",
         "authorizationType": "cookies",
         "authorizationPassword": "test",
+        "cookieExpiry": 86400000,
         "modifiedHeaders": {
             "Host": "%{serverOptions.serverHostname}:%{serverOptions.serverPort}",
             "X-Forwarded-Proto": null,
