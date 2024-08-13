@@ -21,7 +21,6 @@
         "authorizationType": "cookies",
         "modifiedHeaders": {
             "Host": "%{serverOptions.serverHostname}:%{serverOptions.serverPort}",
-            "X-Forwarded-For": null,
             "X-Forwarded-Proto": null,
             "CDN-Loop": null,
             "CF-Visitor": null,
