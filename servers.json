@@ -1,0 +1,3 @@
+[
+    { "proxyHostnames": ["test.", "localhost"], "serverHostname": "localhost", "serverPort": 6969, "authorization": true }
+]
