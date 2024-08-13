@@ -248,7 +248,7 @@ proxyServer.on("connection", proxyConnection => {
                 Buffer.from(rawData)
             ]);
 
-            // console.log(reconstructedData.toString());
+            console.log(reconstructedData.toString());
 
             if (!serverConnection || serverConnection.ended) {
                 // Connect to server
