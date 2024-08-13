@@ -1,8 +1,7 @@
 <script>
     let authorization;
-    while (!authorization) {
-        authorization = prompt("Authorization required");
-    };
-    document.cookie = `%{authorizationCookie}=${authorization}`;
+    while (!authorization) authorization = prompt("Authorization required");
+    const cookieExpiryDate = "%{cookieExpiry}" ? new Date(Date.now() + parseInt("%{cookieExpiry}")).toUTCString() : null;
+    document.cookie = `%{authorizationCookie}=${password.value}${cookieExpiryDate ? `; Expires=${cookieExpiryDate}` : ""}`;
     location.reload();
 </script>
