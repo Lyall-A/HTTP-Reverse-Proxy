@@ -1,3 +1,0 @@
-[
-    { "proxyHostnames": ["test.", "localhost"], "serverHostname": "192.168.1.217", "serverPort": 8096 }
-]
