@@ -1,3 +1,7 @@
 [
-    { "proxyHostnames": ["test.", "localhost"], "serverHostname": "localhost", "serverPort": 6969, "authorization": true }
+    { "proxyHostnames": ["test.", "localhost"], "serverHostname": "localhost", "serverPort": 6969, "authorization": true },
+    { "proxyHostnames": ["speedtest."], "serverHostname": "www.speedtest.net", "serverPort": 443, "useTls": true },
+    { "proxyHostnames": ["fast."], "serverHostname": "fast.com", "serverPort": 443, "useTls": true },
+    { "proxyHostnames": ["google."], "serverHostname": "www.google.com", "serverPort": 443, "useTls": true },
+    { "proxyHostnames": ["youtube."], "serverHostname": "www.youtube.com", "serverPort": 443, "useTls": true }
 ]
