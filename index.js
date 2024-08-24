@@ -235,6 +235,7 @@ proxyServer.on("connection", proxyConnection => {
             });
 
             // Is bypassed URI
+            // TODO: make this better
             const bypassOptions = serverOptions.uriBypass?.[uri];
             if (bypassOptions) {
                 const bypassHeaders = objectDefaults(bypassOptions.headers, { "Content-Length": bypassOptions.data.length || 0 });
@@ -243,7 +244,7 @@ proxyServer.on("connection", proxyConnection => {
 
             // Reconstruct data
             const reconstructedData = Buffer.concat([
-                Buffer.from(requestLine),
+                Buffer.from(`${method} ${serverOptions.forceUri || uri} ${version}`),
                 Buffer.from("\r\n"),
                 Buffer.from(Object.entries(headers).map(i => `${i[0]}: ${i[1]}`).join("\r\n")),
                 Buffer.from("\r\n\r\n"),
