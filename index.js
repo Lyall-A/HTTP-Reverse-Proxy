@@ -94,7 +94,8 @@ proxyServer.on("connection", proxyConnection => {
         const rawData = splitRawData.join("\r\n\r\n");
         const splitHeaders = rawHeaders.split("\r\n");
 
-        const [requestLine, method, uri, version] = splitHeaders[0].match(requestLineRegex) || [];
+        const [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
+
         if (requestLine) {
             const headers = getHeaders(splitHeaders); // Get headers
 
