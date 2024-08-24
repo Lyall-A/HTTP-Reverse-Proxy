@@ -90,7 +90,8 @@ proxyServer.on("connection", proxyConnection => {
 
     proxyConnection.on("data", data => {
         // Proxy server on data
-        const [rawHeaders, rawData = ""] = data.toString().split("\r\n\r\n");
+        const [rawHeaders, ...splitRawData] = data.toString().split("\r\n\r\n");
+        const rawData = splitRawData.join("\r\n\r\n");
         const splitHeaders = rawHeaders.split("\r\n");
 
         const [requestLine, method, uri, version] = splitHeaders[0].match(requestLineRegex) || [];
