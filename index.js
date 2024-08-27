@@ -82,12 +82,6 @@ proxyServer.on("connection", proxyConnection => {
 
     let serverConnection;
 
-    // NOTE: Attempt to fix memory leak (fail)
-    // let proxyQueue = [];
-    // let proxySending = false;
-    // let serverQueue = [];
-    // let serverSending = false;
-
     proxyConnection.on("data", data => {
         // Proxy server on data
         const [rawHeaders, ...splitRawData] = data.toString().split("\r\n\r\n");
@@ -253,7 +247,7 @@ proxyServer.on("connection", proxyConnection => {
 
             // console.log(reconstructedData.toString());
 
-            if (!serverConnection || serverConnection.ended) {
+            if (!serverConnection) {
                 // Connect to server
                 log(3, `IP ${ipFormatted} connecting to ${hostname}`);
 
@@ -272,6 +266,8 @@ proxyServer.on("connection", proxyConnection => {
                     closeAll("serverConnection error");
                     logServerError(err);
                 });
+
+                serverConnection.on("drain", () => proxyConnection.resume());
             }
 
             writeServerConnection(reconstructedData); // Write changed data if this buffer contains headers
@@ -286,9 +282,9 @@ proxyServer.on("connection", proxyConnection => {
         closeAll("proxyConnection error");
         logProxyError(err);
     });
+    proxyConnection.on("drain", () => serverConnection?.resume());
     
     // Functions
-    // TODO: very bad memory leak, for example if a server sends a 1gb file, the proxy will use up 1gb of memory even after the connection is closed
     function closeAll(reason) {
         log(4, "Closing all, reason:", reason);
         closeServerConnection();
@@ -296,71 +292,27 @@ proxyServer.on("connection", proxyConnection => {
     }
     
     function closeServerConnection() {
-        if (serverConnection && !serverConnection.ended && !proxyConnection.destroyed) {
+        if (serverConnection && !serverConnection.ended) {
             log(4, `Closing serverConnection`);
             serverConnection.end();
-            // serverQueue = [];
         }
     }
 
     function closeProxyConnection() {
-        if (proxyConnection && !proxyConnection.ended && !proxyConnection.destroyed) {
+        if (proxyConnection && !proxyConnection.ended) {
             log(4, `Closing proxyConnection`);
             proxyConnection.end();
-            // proxyQueue = [];
         }
     }
 
     function writeServerConnection(data) {
         // log(4, `Writing ${data.length} bytes to serverConnection`);
-        if (serverConnection && !serverConnection.ended && !serverConnection.destroyed) serverConnection.write(data);
-        // NOTE: Attempt to fix memory leak (fail)
-        // if (serverConnection && !serverConnection.ended && !serverConnection.destroyed) {
-        //     if (data !== true) {
-            //         serverQueue.push(data);
-            //     }
-
-            //     if (serverSending || !serverQueue.length) return;
-            
-            //     serverSending = true;
-            //     data = serverQueue.shift();
-            
-            //     if (!serverConnection.write(data)) {
-        //         serverConnection.once("drain", () => {
-            //             serverSending = false;
-            //             writeServerConnection(true);
-            //         });
-            //     } else {
-                //         serverSending = false;
-                //         writeServerConnection(true);
-                //     }
-        // }
+        if (serverConnection && !serverConnection.ended) if (!serverConnection.write(data)) proxyConnection.pause();
     }
     
     function writeProxyConnection(data) {
         // log(4, `Writing ${data.length} bytes to proxyConnection`);
-        if (proxyConnection && !proxyConnection.ended && !proxyConnection.destroyed) proxyConnection.write(data);
-        // NOTE: Attempt to fix memory leak (fail)
-        // if (proxyConnection && !proxyConnection.ended && !proxyConnection.destroyed) {
-            //     if (data !== true) {
-                //         proxyQueue.push(data);
-                //     }
-
-        //     if (proxySending || !proxyQueue.length) return;
-            
-        //     proxySending = true;
-        //     data = proxyQueue.shift();
-
-        //     if (!proxyConnection.write(data)) {
-        //         proxyConnection.once("drain", () => {
-        //             proxySending = false;
-        //             writeProxyConnection(true);
-        //         });
-        //     } else {
-        //         proxySending = false;
-        //         writeProxyConnection(true);
-        //     }
-        // }
+        if (proxyConnection && !proxyConnection.ended) if (!proxyConnection.write(data)) serverConnection.pause();
     }
 });
 
