@@ -24,12 +24,12 @@
     </style>
     <style>
         :root {
-            --bg-color: rgb(20, 20, 20);
-            --form-bg-color: rgb(29, 29, 29);
+            --bg-color: rgb(17, 17, 17);
+            --form-bg-color: rgb(26, 26, 26);
             --input-bg-color: rgb(43, 43, 44);
             --input-border-color: rgb(129, 129, 129);
-            --btn-bg-color: rgb(61, 60, 60);
-            --btn-hover-bg-color: rgb(71, 71, 71);
+            --btn-bg-color: rgb(49, 49, 49);
+            --btn-hover-bg-color: rgb(56, 56, 56);
             --link-color: rgb(153, 153, 153);
             --link-hover-color: rgb(185, 185, 185);
             --white: rgb(221, 221, 221);
@@ -49,11 +49,11 @@
         body {
             height: 100%;
             width: 100%;
-        }
-
-        body {
             padding: 0;
             margin: 0;
+        }
+
+        body {  
             display: flex;
             justify-content: center;
             align-items: center;
@@ -64,7 +64,7 @@
             display: flex;
             flex-direction: column;
             background-color: var(--form-bg-color);
-            border-radius: 10px;
+            border-radius: 15px;
             padding: 30px;
             min-width: min(80%, 350px);
             max-width: 350px;
@@ -81,7 +81,7 @@
             font-size: 1em;
             color: var(--white-50);
             margin: 0;
-            margin-bottom: 20%;
+            margin-bottom: 15%;
         }
 
         .password-text {
@@ -146,12 +146,11 @@
 <body>
     <div id="form">
         <h1 class="header">Proxy Authorization</h1>
-        <h2 class="sub-header">Authorization is required to go here</h2>
+        <h2 class="sub-header">Authorization is required to go here.</h2>
         <div class="password-text">Password</div>
-        <input type="password" placeholder="Password" id="password">
+        <input type="password" onkeydown="event.keyCode === 13 ? authorize() : null" placeholder="Password" id="password">
         <button class="authorize-btn" onclick="authorize()">Authorize</button>
-        <div class="footer"><a href="https://github.com/Lyall-A/HTTP-Reverse-Proxy">HTTP-Reverse-Proxy</a> on GitHub
-        </div>
+        <div class="footer"><a href="https://github.com/Lyall-A/HTTP-Reverse-Proxy">HTTP-Reverse-Proxy</a> on GitHub</div>
     </div>
     <script>
         const password = document.getElementById("password"); // Password input
@@ -162,16 +161,8 @@
             document.title = `${location.hostname} | Proxy Authorization`; // Set title
         }
 
-        // Attempt to authorize on enter key
-        document.onkeydown = e => {
-            if (e.keyCode == 13 && document.activeElement === password) authorize();
-        }
-
         function authorize() {
-            if (!password.value) {
-                // No input
-                return;
-            }
+            if (!password.value) return; // No input
             const cookieExpiryDate = "%{cookieExpiry}" ? new Date(Date.now() + parseInt("%{cookieExpiry}")).toUTCString() : null; // Cookie expiry date
             document.cookie = `%{authorizationCookie}=${password.value}${cookieExpiryDate ? `; Expires=${cookieExpiryDate}` : ""}`; // Set authorization cookie
             location.reload(); // Reload
