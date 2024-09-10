@@ -447,12 +447,12 @@ function stringifyCookies(cookies) {
  * @returns {object} Merged objects
  */
 function objectDefaults(obj, def) {
-    if (!obj instanceof Object) return def;
-    
+    if (typeof obj !== "object" || obj === null) return def;
+
     return (function checkEntries(object = obj, defaultObj = def) {
         Object.entries(defaultObj).forEach(([key, value]) => {
             if (object[key] === undefined) object[key] = value;
-            else if (value instanceof Object && object[key] instanceof Object) checkEntries(object[key], value);
+            else if (typeof value === "object" && value !== null && typeof object[key] === "object" && object[key] !== null) checkEntries(object[key], value);
         });
         return object;
     })();
