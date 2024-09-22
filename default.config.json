@@ -9,10 +9,10 @@
     "additionalProxyServerOptions": {
         
     },
-    "supportedVersions": [
-        "HTTP/1.1"
-    ],
     "defaultServerOptions": {
+        "supportedVersions": [
+            "HTTP/1.1"
+        ],
         "whitelist": "whitelist.json",
         "blacklist": null,
         "realIpHeader": "CF-Connecting-IP",
