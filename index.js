@@ -93,6 +93,9 @@ proxyServer.on("connection", proxyConnection => {
         if (requestLine) {
             const headers = getHeaders(splitHeaders); // Get headers
 
+            let realIp = config.defaultServerOptions.realIpHeader ? headers[config.defaultServerOptions.realIpHeader] : null; // Get real IP using default realIpHeader config (if using some sort of proxy like Cloudflare)
+            let ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
+
             // Get hostname
             const [hostname] = getHeader(headers, "Host")?.match(hostnameRegex) || [];
 
@@ -105,17 +108,14 @@ proxyServer.on("connection", proxyConnection => {
 
             const serverOptions = objectDefaults(server, config.defaultServerOptions || {}); // Get default server options + found server options
 
-            let realIp = config.defaultServerOptions.realIpHeader ? headers[config.defaultServerOptions.realIpHeader] : null; // Get real IP using default realIpHeader config (if using some sort of proxy like Cloudflare)
-            let ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
+            realIp = serverOptions.realIpHeader ? headers[serverOptions.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
+            ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
 
             // Make sure using supported version
             if (serverOptions.supportedVersions && !serverOptions.supportedVersions.includes(version)) {
                 log(2, `IP ${ipFormatted} using unsupported version ${version}`);
                 return proxyConnection.end();
             }
-
-            realIp = serverOptions.realIpHeader ? headers[serverOptions.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
-            ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
 
             // Check whitelist/blacklist again with custom options
             // Whitelist
