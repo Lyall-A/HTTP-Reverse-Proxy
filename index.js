@@ -67,17 +67,17 @@ const proxyServer = (config.tls ? tls : net).createServer({
 proxyServer.on("connection", proxyConnection => {
     // Get IP
     const ip = proxyConnection.remoteAddress?.split("::ffff:")[1] || proxyConnection.remoteAddress;
-    if (!ip) return proxyConnection.end(); // Why does this happen sometimes?
+    if (!ip) return proxyConnection.destroy(); // Why does this happen sometimes?
 
     // Default whitelist
     if (defaultWhitelist && !ipMatch(ip, defaultWhitelist)) {
         log(1, `Unwhitelisted IP ${ip} attempted to connect!`);
-        return proxyConnection.end();
+        return proxyConnection.destroy();
     }
     // Default blacklist
     if (defaultBlacklist && ipMatch(ip, defaultBlacklist)) {
         log(1, `Blacklisted IP ${ip} attempted to connect!`);
-        return proxyConnection.end();
+        return proxyConnection.destroy();
     }
 
     let serverConnection;
@@ -103,7 +103,7 @@ proxyServer.on("connection", proxyConnection => {
             const server = findServer(hostname);
             if (!server) {
                 log(2, `IP ${ipFormatted} tried to reach unknown hostname ${hostname}`);
-                return proxyConnection.end();
+                return proxyConnection.destroy();
             }
 
             const serverOptions = objectDefaults(server, config.defaultServerOptions || {}); // Get default server options + found server options
@@ -114,7 +114,7 @@ proxyServer.on("connection", proxyConnection => {
             // Make sure using supported version
             if (serverOptions.supportedVersions && !serverOptions.supportedVersions.includes(version)) {
                 log(2, `IP ${ipFormatted} using unsupported version ${version}`);
-                return proxyConnection.end();
+                return proxyConnection.destroy();
             }
 
             // Check whitelist/blacklist again with custom options
@@ -122,21 +122,21 @@ proxyServer.on("connection", proxyConnection => {
             const whitelist = serverOptions.whitelist !== config.defaultServerOptions.whitelist ? readJson(serverOptions.whitelist) : null;
             if (whitelist && !ipMatch(ip, whitelist)) {
                 log(1, `Unwhitelisted IP ${ip} attempted to connect!`);
-                return proxyConnection.end();
+                return proxyConnection.destroy();
             }
             // Blacklist
             const blacklist = serverOptions.blacklist !== config.defaultServerOptions.blacklist ? readJson(serverOptions.blacklist) : null;
             if (blacklist && ipMatch(ip, blacklist)) {
                 log(1, `Blacklisted IP ${ip} attempted to connect!`);
-                return proxyConnection.end();
+                return proxyConnection.destroy();
             }
 
             // Server requires authorization
             if (serverOptions.authorization) {
                 if (!serverOptions.authorizationPassword) {
-                    // No authorization password set, end
+                    // No authorization password set
                     log(1, `IP ${ipFormatted} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
-                    return proxyConnection.end();
+                    return proxyConnection.destroy();
                 }
 
                 let authorized = false;
@@ -197,9 +197,9 @@ proxyServer.on("connection", proxyConnection => {
 
                         authorized = true;
                     } else {
-                        // Unknown authorization type, end
+                        // Unknown authorization type
                         log(1, `IP ${ipFormatted} tried to reach ${hostname} which requires authorization, but an unknown authorization type was set`);
-                        return proxyConnection.end();
+                        return proxyConnection.destroy();
                     }
                 }
             }
@@ -290,7 +290,7 @@ proxyServer.on("connection", proxyConnection => {
 });
 
 // Listen
-proxyServer.listen(config.port, config.hostname, () => log(1, `Listening at :${config.port}`));
+proxyServer.listen(config.port, config.hostname, () => log(0, `Proxy server listening at :${config.port}`));
 
 // Close
 process.on("SIGINT", closeProxy);
