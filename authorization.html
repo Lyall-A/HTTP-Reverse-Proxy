@@ -163,8 +163,7 @@
 
         function authorize() {
             if (!password.value) return; // No input
-            const cookieExpiryDate = "%{cookieExpiry}" ? new Date(Date.now() + parseInt("%{cookieExpiry}")).toUTCString() : null; // Cookie expiry date
-            document.cookie = `%{authorizationCookie}=${password.value}${cookieExpiryDate ? `; Expires=${cookieExpiryDate}` : ""}`; // Set authorization cookie
+            document.cookie = `%{authorizationCookie}=${password.value}; path=/${"%{cookieMaxAge}" ? `; max-age=%{cookieMaxAge}` : ""}`; // Set authorization cookie
             location.reload(); // Reload
         }
     </script>

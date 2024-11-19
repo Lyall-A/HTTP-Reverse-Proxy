@@ -20,10 +20,10 @@ global.unwatchServers = watch("servers.json", true, file => {
 
 // Default authorization HTML
 let defaultAuthorizationHtmlFile = fs.readFileSync("authorization.html", "utf-8");
-let defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { config, cookieExpiry: config.defaultServerOptions.cookieExpiry, authorizationCookie: config.defaultServerOptions.authorizationCookie });
+let defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { config, cookieMaxAge: config.defaultServerOptions.cookieMaxAge, authorizationCookie: config.defaultServerOptions.authorizationCookie });
 global.unwatchAuthorizationHtml = watch("authorization.html", false, file => {
     defaultAuthorizationHtmlFile = file;
-    defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { config, cookieExpiry: config.defaultServerOptions.cookieExpiry, authorizationCookie: config.defaultServerOptions.authorizationCookie });
+    defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { config, cookieMaxAge: config.defaultServerOptions.cookieMaxAge, authorizationCookie: config.defaultServerOptions.authorizationCookie });
     log(0, "Updated authorization HTML");
 });
 
@@ -159,7 +159,7 @@ proxyServer.on("connection", proxyConnection => {
                         if (cookies[serverOptions.authorizationCookie] !== serverOptions.authorizationPassword) {
                             // Incorrect or no authorization cookie
                             if (!isLastType) return;
-                            const authorizationHtml = serverOptions.authorizationCookie !== config.defaultServerOptions.authorizationCookie ? formatString(defaultAuthorizationHtmlFile, { config, serverOptions, cookieExpiry: config.defaultServerOptions.cookieExpiry, authorizationCookie: serverOptions.authorizationCookie }) : defaultAuthorizationHtml
+                            const authorizationHtml = serverOptions.authorizationCookie !== config.defaultServerOptions.authorizationCookie ? formatString(defaultAuthorizationHtmlFile, { config, serverOptions, cookieMaxAge: config.defaultServerOptions.cookieMaxAge, authorizationCookie: serverOptions.authorizationCookie }) : defaultAuthorizationHtml
                             log(2, `IP ${ipFormatted} tried to reach ${hostname} which requires authorization`);
                             proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
                             return;
