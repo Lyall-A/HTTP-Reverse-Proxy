@@ -12,6 +12,26 @@ function readJson(filePath) {
 }
 
 /**
+ * Parses a text file and returns an array of non-empty, non-comment lines.
+ * Lines starting with `//` or `#`, or lines that are empty, are ignored.
+ *
+ * @param {string} fileContent - The content of the text file as a string.
+ * @returns {string[]} An array of strings containing the valid lines from the file.
+ */
+function parseTxtFile(fileContent) {
+    const lines = fileContent.split('\n');
+    const parsedLines = [];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        // Skip empty lines or comments
+        if (line && !(line.startsWith('//') && line.startsWith('#'))) {
+            parsedLines.push(line);
+        }
+    }
+    return parsedLines;
+}
+
+/**
  * Log
  * @param {number} level Logging level
  * @param  {...any} msg Message to log
