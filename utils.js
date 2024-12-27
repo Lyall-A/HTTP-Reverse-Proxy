@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 
 const headersRegex = /^(.*?): ?(.*)$/m; // Host: localhost
 
@@ -37,7 +38,8 @@ function parseTxtFile(fileContent) {
  * @param  {...any} msg Message to log
  */
 function log(level, ...msg) {
-    if (config.loggingLevel >= level) console.log(`[${timestamp()}]`, ...msg);
+    //if (typeof LOGLEVEL !=='undefined' && LOGLEVEL >= level)
+    console.log(`[${timestamp()}]`, ...msg);
 }
 
 /**
@@ -95,17 +97,22 @@ function getHeaders(splitHeaders) {
 
 /**
  * Find server object using hostname
+ * @param {Map} services A Map of services with keys as identifiers and values as server objects
  * @param {string} hostname Hostname to search for
- * @returns {object} Server object
+ * @returns {object|null} Server object or null if not found
  */
-function findServer(hostname) {
-    if (typeof hostname != "string") return null;
-    return servers.find(i => i?.proxyHostnames?.find(i =>
-        i.startsWith(".") ? hostname.endsWith(i) :
-            i.endsWith(".") ? hostname.startsWith(i) :
-                hostname === i
-    ));
+function findService(services, hostname) {
+    if (typeof hostname !== "string") return null;
+    for (const service of services.values()) {
+        if (service?.proxyHostnames?.some(str =>
+            str.startsWith(".") ? hostname.endsWith(str) :
+            str.endsWith(".") ? hostname.startsWith(str) :
+            hostname === str
+        )) return service;
+    }
+    return null;
 }
+
 
 /**
  * Formats strings with `%{}` syntax and dot notation (eg. `%{hello.world}` with options `{ hello: { world: "Hello, World!" } }`)
@@ -161,24 +168,141 @@ function objectDefaults(obj, def) {
     })();
 }
 
+const watchers = new Map();
+
 /**
- * Watches for file change
- * @param {string} file File path to watch for
- * @param {boolean} json If file should be parsed when changed
+ * Watches for file changes
+ * @param {string} filepath File path to watch
  * @param {function} callback Callback for when file is changed
  */
-function watch(file, json, callback) {
-    const listener = fs.watchFile(file, () => {
-        if (!json) return callback(fs.readFileSync(file, "utf-8"));
-        try {
-            callback(readJson(file));
-        } catch (err) {
-            console.error(`Failed to read '${file}', error:`, err);
+function watch(filepath, callback) {
+    const isJson = filepath.endsWith('.json');
+    const listener = () => {
+        if (isJson) {
+            try {
+                callback(readJson(filepath));
+            } catch (err) {
+                console.error(`Failed to read '${filepath}', error:`, err);
+            }
+        } else {
+            try {
+                callback(fs.readFileSync(filepath, "utf-8"));
+            } catch (err) {
+                console.error(`Failed to read '${filepath}', error:`, err);
+            }
         }
-    });
+    };
 
-    return () => fs.unwatchFile(file, listener);
+    if (!watchers.has(filepath)) {
+        watchers.set(filepath, []);
+    }
+    fs.watchFile(filepath, listener);
+    watchers.get(filepath).push(listener);
+    listener(); // call once
 }
+
+/**
+ * Stops watching a specific file
+ * @param {string} filepath File path to unwatch
+ */
+function unwatch(filepath) {
+    if (watchers.has(filepath)) {
+        const listeners = watchers.get(filepath);
+        listeners.forEach(listener => fs.unwatchFile(filepath, listener));
+        watchers.delete(filepath);
+    }
+}
+
+/**
+ * Stops watching all files
+ */
+function unwatchAll() {
+    for (const [filepath, listeners] of watchers.entries()) {
+        listeners.forEach(listener => fs.unwatchFile(filepath, listener));
+    }
+    watchers.clear();
+}
+
+function createLiveFileMap(globPattern, onRead) {
+    const watchDirectory = path.dirname(globPattern);
+    const fileExtension = path.extname(globPattern).slice(1);
+
+    const map = new Map();
+    map.init = init;
+    map.watch = watch;
+    map.unwatch = unwatch;
+
+    function init() {
+        const files = fs.readdirSync(watchDirectory);
+        for (const filename of files) {
+            if (filename.endsWith(`.${fileExtension}`) && !filename.startsWith('_')) {
+                const fullPath = path.join(watchDirectory, filename);
+                const key = path.basename(filename, `.${fileExtension}`);
+                try {
+                    let fileContent = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+                    if (onRead) fileContent = onRead(fileContent, key, filename);
+                    map.set(key, fileContent);
+                } catch (err) {
+                    console.error(`Error reading JSON from ${fullPath}:`, err);
+                }
+            }
+        }
+    }
+
+    function watch() {
+        map.watcher = fs.watch(watchDirectory, (eventType, filename) => {
+            if (!filename) return;
+
+            const fullPath = path.join(watchDirectory, filename);
+
+            if (eventType === 'rename') {
+                if (fs.existsSync(fullPath)) {
+                    if (filename.endsWith(`.${fileExtension}`) && !filename.startsWith('_')) {
+                        const key = path.basename(filename, `.${fileExtension}`);
+                        try {
+                            let fileContent = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+                            if (onRead) fileContent = onRead(fileContent, key, filename);
+                            map.set(key, fileContent);
+                            console.log(`File added or updated: ${filename}`);
+                        } catch (err) {
+                            console.error(`Error reading JSON from ${fullPath}:`, err);
+                        }
+                    }
+                } else {
+                    const key = path.basename(filename, `.${fileExtension}`);
+                    map.delete(key);
+                    console.log(`File removed: ${filename}`);
+                }
+            } else if (eventType === 'change') {
+                if (filename.endsWith(`.${fileExtension}`) && !filename.startsWith('_')) {
+                    const key = path.basename(filename, `.${fileExtension}`);
+                    try {
+                        let fileContent = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+                        if (onRead) fileContent = onRead(fileContent, key, filename);
+                        map.set(key, fileContent);
+                        console.log(`File changed: ${filename}`);
+                    } catch (err) {
+                        console.error(`Error reading JSON from ${fullPath}:`, err);
+                    }
+                }
+            }
+        });
+
+        console.log('Watcher started.');
+    }
+
+    function unwatch() {
+        if (map.watcher) {
+            map.watcher.close();
+            console.log('Watcher stopped.');
+        }
+    }
+
+    init();
+  
+    return map;
+}
+
 
 /**
  * Finds specific header case-insensitive
@@ -222,20 +346,58 @@ function timestamp() {
     return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
 }
 
+/**
+ * Returns the options object deeply merged with the defaults.
+ * Extranous properties are not included in the returned object.
+ * @param {object} defaults - The object that contains the default values.
+ * @param {object|undefined|null} [options] - The object to be merged into defaultObj. (it does not mutate this argument)
+ * @returns {object} the merged object.
+ *
+ * @example
+ * function myFunction(options) {
+ *   options = defaults({
+ *     foo: true,
+ *     bar: {
+ *       a: 1,
+ *       b: 2,
+ *     },
+ *   }, options);
+ *
+ *   // do stuff with options
+ * }
+ */
+function defaults(defaults, options) {
+    function isObj(x) { return x !== null && typeof x === 'object'; }
+    function hasOwn(obj, prop) { return Object.prototype.hasOwnProperty.call(obj, prop); }
+  
+    if (isObj(options)) for (let prop in defaults) {
+      if (hasOwn(defaults, prop) && hasOwn(options, prop) && options[prop] !== undefined) {
+        if (isObj(defaults[prop])) defaults(defaults[prop], options[prop]);
+        else defaults[prop] = options[prop];
+      }
+    }
+    return defaults;
+  }
+
 module.exports = {
     readJson,
+    parseTxtFile,
     log,
     logProxyError,
     logServerError,
     ipMatch,
     getHeaders,
-    findServer,
+    findService,
     formatString,
     parseCookies,
     stringifyCookies,
     objectDefaults,
     watch,
+    unwatch,
+    unwatchAll,
+    createLiveFileMap,
     getHeader,
     setHeader,
-    timestamp
+    timestamp,
+    defaults,
 };

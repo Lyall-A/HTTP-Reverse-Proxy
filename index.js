@@ -1,82 +1,120 @@
 const net = require("net");
 const tls = require("tls");
 const fs = require("fs");
-
-const { readJson, log, logProxyError, logServerError, ipMatch, getHeaders, findServer, formatString, parseCookies, stringifyCookies, objectDefaults, watch, getHeader, setHeader, timestamp } = require("./utils");
-
-// Config
-global.config = readJson("config.json");
-global.unwatchConfig = watch("config.json", true, file => {
-    config = file;
-    log(0, "Updated config");
-});
-
-// Servers
-global.servers = readJson("servers.json").filter(i => !i?.disabled);
-global.unwatchServers = watch("servers.json", true, file => {
-    servers = file.filter(i => !i?.disabled);
-    log(0, "Updated servers");
-});
-
-// Default authorization HTML
-let defaultAuthorizationHtmlFile = fs.readFileSync("authorization.html", "utf-8");
-// let defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { config, cookieMaxAge: config.defaultServerOptions.cookieMaxAge, authorizationCookie: config.defaultServerOptions.authorizationCookie });
-global.unwatchAuthorizationHtml = watch("authorization.html", false, file => {
-    defaultAuthorizationHtmlFile = file;
-    // defaultAuthorizationHtml = formatString(defaultAuthorizationHtmlFile, { config, cookieMaxAge: config.defaultServerOptions.cookieMaxAge, authorizationCookie: config.defaultServerOptions.authorizationCookie });
-    log(0, "Updated authorization HTML");
-});
-
-// Default whitelist
-let defaultWhitelist;
-if (config.defaultServerOptions.whitelist) {
-    defaultWhitelist = readJson(config.defaultServerOptions.whitelist);
-    global.unwatchDefaultWhitelist = watch(config.defaultServerOptions.whitelist, true, file => {
-        defaultWhitelist = file;
-        log(0, "Updated default whitelist");
-    });
-}
-
-// Default blacklist
-let defaultBlacklist;
-if (config.defaultServerOptions.blacklist) {
-    defaultBlacklist = readJson(config.defaultServerOptions.blacklist);
-    global.unwatchDefaultBlacklist = watch(config.defaultServerOptions.blacklist, true, file => {
-        defaultBlacklist = file;
-        log(0, "Updated default blacklist");
-    });
-}
+const {
+    readJson,
+    parseTxtFile,
+    log,
+    logProxyError,
+    logServerError,
+    ipMatch,
+    getHeaders,
+    findService,
+    formatString,
+    parseCookies,
+    stringifyCookies,
+    objectDefaults,
+    watch,
+    unwatch,
+    unwatchAll,
+    createLiveFileMap,
+    getHeader,
+    setHeader,
+    timestamp,
+    defaults
+} = require("./utils");
 
 // Regex
 const requestLineRegex = /^(.*) (.*) (HTTP\/\d*\.\d*)$/im; // GET /hello/world HTTP/1.1
 const hostnameRegex = /[^:]*/; // localhost (excludes port)
 
-// Initial logs
-if (defaultWhitelist) log(0, `\nDefault whitelist: ${defaultWhitelist.length}\n${defaultWhitelist.join("\n")}`);
-if (defaultBlacklist) log(0, `\nDefault blacklist: ${defaultBlacklist.length}\n${defaultBlacklist.join("\n")}`);
-log(0, `\nServers: ${servers.length}\n${servers.map(i => `${i.proxyHostnames.join(", ")} > ${i.redirect || `${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`}`).join("\n")}\n`);
+// Global variables
+let proxyConfig = {};
+let serviceDefaults = {};
+let services = new Map();
+
+let globalWhitelist;
+let globalBlacklist;
+
+
+function main () {    
+
+    // Config
+    watch("config.json", json => {
+        log(0, "Loaded config");
+        proxyConfig = json;
+    });
+
+    // Defaults for services
+    watch("./services/_defaults.json", json => {
+        log(0, "serviceDefaults config");
+        serviceDefaults = json;
+    });
+
+    // Live load services
+    services = createLiveFileMap('./services/*.json', (service, key, filename) => {
+        log(0, "Loaded service", filename);
+        // const service = defaults(serviceDefaults, json);
+        return service;
+    });
+    services.watch();
+
+    // Authorization HTML
+    watch("authorization.html", file => {
+        defaultAuthorizationHtmlFile = file;
+        log(0, "Loaded authorization HTML");
+    });
+
+    // Global whitelist
+    if (proxyConfig.whitelist)
+    watch(proxyConfig.whitelist, file => {
+        globalWhitelist = parseTxtFile(file);
+        log(0, "Loaded global whitelist", `(${globalWhitelist.length} entries)`);
+    });
+    if (globalWhitelist) log(0, `\nDefault whitelist: ${globalWhitelist.length}\n${globalWhitelist.join("\n")}`);
+
+    // Global blacklist
+    if (proxyConfig.blacklist)
+    watch(proxyConfig.blacklist, file => {
+        globalBlacklist = parseTxtFile(file);
+        log(0, "Loaded global blacklist", `(${globalBlacklist.length} entries)`);
+    });
+    if (globalBlacklist) log(0, `\nDefault blacklist: ${globalBlacklist.length}\n${globalBlacklist.join("\n")}`);
+    
+
+}
+
+main();
+
+
+
+// log(0, `\nServers: ${services.size}\n${Object.entries(Array.from(services.entries()).map(i => `${i.proxyHostnames.join(", ")} > ${i.redirect || `${i.serverHostname}:${i.serverPort}${i.tls ? " (TLS)" : ""}`}`).join("\n")}\n`);
 
 // Create proxy server
-const proxyServer = (config.tls ? tls : net).createServer({
-    key: fs.existsSync(config.key) ? fs.readFileSync(config.key) : undefined,
-    cert: fs.existsSync(config.cert) ? fs.readFileSync(config.cert) : undefined,
-    ...config.additionalProxyServerOptions
+const proxyServer = (proxyConfig.tls ? tls : net).createServer({
+    key: fs.existsSync(proxyConfig.key) ? fs.readFileSync(proxyConfig.key) : undefined,
+    cert: fs.existsSync(proxyConfig.cert) ? fs.readFileSync(proxyConfig.cert) : undefined,
+    ...proxyConfig.additionalProxyServerOptions
 });
 
 // Proxy server on connection
 proxyServer.on("connection", proxyConnection => {
     // Get IP
     const ip = proxyConnection.remoteAddress?.split("::ffff:")[1] || proxyConnection.remoteAddress;
-    if (!ip) return proxyConnection.destroy(); // Why does this happen sometimes?
 
-    // Default whitelist
-    if (defaultWhitelist && !ipMatch(ip, defaultWhitelist)) {
-        log(1, `[REFUSED] Unwhitelisted IP ${ip} attempted to connect!`);
+    if (!ip) {
+        log(1, `[REFUSED] No IP?!`);
+        return proxyConnection.destroy(); // Why does this happen sometimes?
+    }
+
+    // Global Blacklist
+    if (globalBlacklist && ipMatch(ip, globalBlacklist)) {
+        log(1, `[REFUSED] Blacklisted IP ${ip} attempted to connect!`);
         return proxyConnection.destroy();
     }
-    // Default blacklist
-    if (defaultBlacklist && ipMatch(ip, defaultBlacklist)) {
-        log(1, `[REFUSED] Blacklisted IP ${ip} attempted to connect!`);
+    // Global Whitelist
+    if (globalWhitelist && !ipMatch(ip, globalWhitelist)) {
+        log(1, `[REFUSED] Unwhitelisted IP ${ip} attempted to connect!`);
         return proxyConnection.destroy();
     }
 
@@ -91,49 +129,53 @@ proxyServer.on("connection", proxyConnection => {
         const [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
 
         if (requestLine) {
-            const headers = getHeaders(splitHeaders); // Get headers
-
-            let realIp = config.defaultServerOptions.realIpHeader ? headers[config.defaultServerOptions.realIpHeader] : null; // Get real IP using default realIpHeader config (if using some sort of proxy like Cloudflare)
-            let ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
+            // Get headers
+            const headers = getHeaders(splitHeaders);
 
             // Get hostname
             const [hostname] = getHeader(headers, "Host")?.match(hostnameRegex) || [];
 
-            // Find server
-            const server = findServer(hostname);
-            if (!server) {
+            // Get real IP using default realIpHeader config (if using some sort of proxy like Cloudflare)
+            let realIp = serviceDefaults.realIpHeader ? headers[serviceDefaults.realIpHeader] : null;
+            let ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
+
+            // Find service to handle this request
+            const service = findService(services, hostname);
+            if (!service) {
                 log(2, `[NOHOST] IP ${ipFormatted} tried to reach unknown hostname ${hostname}`);
                 return proxyConnection.destroy();
             }
 
-            const serverOptions = objectDefaults(server, config.defaultServerOptions || {}); // Get default server options + found server options
+            // Get default server options + found server options
+            const serviceOptions = objectDefaults(service, serviceDefaults || {});
 
-            realIp = serverOptions.realIpHeader ? headers[serverOptions.realIpHeader] : null; // Get real IP (if using some sort of proxy like Cloudflare)
+            // Get real IP (if using some sort of proxy like Cloudflare)
+            realIp = serviceOptions.realIpHeader ? headers[serviceOptions.realIpHeader] : null;
             ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
 
             // Make sure using supported version
-            if (serverOptions.supportedVersions && !serverOptions.supportedVersions.includes(version)) {
+            if (serviceOptions.supportedVersions && !serviceOptions.supportedVersions.includes(version)) {
                 log(2, `[UNSUPPORTED] IP ${ipFormatted} using unsupported version ${version}`);
                 return proxyConnection.destroy();
             }
 
             // Check whitelist/blacklist again with custom options
             // Whitelist
-            const whitelist = serverOptions.whitelist !== config.defaultServerOptions.whitelist ? readJson(serverOptions.whitelist) : null;
+            const whitelist = serviceOptions.whitelist !== serviceDefaults.whitelist ? readJson(serviceOptions.whitelist) : null;
             if (whitelist && !ipMatch(ip, whitelist)) {
                 log(1, `[REFUSED] Unwhitelisted IP ${ip} attempted to connect!`);
                 return proxyConnection.destroy();
             }
             // Blacklist
-            const blacklist = serverOptions.blacklist !== config.defaultServerOptions.blacklist ? readJson(serverOptions.blacklist) : null;
+            const blacklist = serviceOptions.blacklist !== serviceDefaults.blacklist ? readJson(serviceOptions.blacklist) : null;
             if (blacklist && ipMatch(ip, blacklist)) {
                 log(1, `[REFUSED] Blacklisted IP ${ip} attempted to connect!`);
                 return proxyConnection.destroy();
             }
 
-            // Server requires authorization
-            if (serverOptions.authorization) {
-                if (!serverOptions.authorizationPassword) {
+            // Service requires authorization
+            if (serviceOptions.authorization) {
+                if (!serviceOptions.authorizationPassword) {
                     // No authorization password set
                     log(1, `[AUTH] IP ${ipFormatted} tried to reach ${hostname} which requires authorization, but no authorization password was set`);
                     return proxyConnection.destroy();
@@ -141,12 +183,12 @@ proxyServer.on("connection", proxyConnection => {
 
                 let authorized = false;
 
-                if (typeof serverOptions.authorizationType === "object") {
-                    serverOptions.authorizationType.forEach((authorizationType, index, array) => {
+                if (typeof serviceOptions.authorizationType === "object") {
+                    serviceOptions.authorizationType.forEach((authorizationType, index, array) => {
                         checkAuthorization(authorizationType.toLowerCase(), index === array.length - 1);
                     });
                 } else {
-                    checkAuthorization(serverOptions.authorizationType?.toLowerCase(), true);
+                    checkAuthorization(serviceOptions.authorizationType?.toLowerCase(), true);
                 };
 
                 function checkAuthorization(authorizationType, isLastType) {
@@ -156,14 +198,14 @@ proxyServer.on("connection", proxyConnection => {
                         // Authorize using Cookies
                         const cookies = parseCookies(getHeader(headers, "Cookie") || "");
 
-                        if (cookies[serverOptions.authorizationCookie] !== serverOptions.authorizationPassword) {
+                        if (cookies[serviceOptions.authorizationCookie] !== serviceOptions.authorizationPassword) {
                             // Incorrect or no authorization cookie
                             if (!isLastType) return;
                             const vars = {
                                 config,
-                                serverOptions,
-                                cookieMaxAge: config.defaultServerOptions.cookieMaxAge,
-                                authorizationCookie: serverOptions.authorizationCookie,
+                                serverOptions: serviceOptions,
+                                cookieMaxAge: serviceDefaults.cookieMaxAge,
+                                authorizationCookie: serviceOptions.authorizationCookie,
                                 hostname,
                                 ip: realIp || ip,
                             };
@@ -176,13 +218,13 @@ proxyServer.on("connection", proxyConnection => {
                         authorized = true;
 
                         // Remove cookie before sending to server
-                        delete cookies[serverOptions.authorizationCookie];
+                        delete cookies[serviceOptions.authorizationCookie];
                         setHeader(headers, "Cookie", stringifyCookies(cookies));
                     } else if (authorizationType === "www-authenticate") {
                         // Authorize using WWW-Authenticate header
                         const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
 
-                        if (password !== serverOptions.authorizationPassword) {
+                        if (password !== serviceOptions.authorizationPassword) {
                             // Incorrect or no WWW-Authorization header
                             if (!isLastType) return;
                             log(2, `[AUTH] IP ${ipFormatted} tried to reach ${hostname} which requires authorization`);
@@ -193,9 +235,9 @@ proxyServer.on("connection", proxyConnection => {
                         authorized = true;
                     } else if (authorizationType === "custom-header") {
                         // Authorize using custom header
-                        const header = getHeader(headers, serverOptions.customAuthorizationHeader);
+                        const header = getHeader(headers, serviceOptions.customAuthorizationHeader);
 
-                        if (header !== serverOptions.authorizationPassword) {
+                        if (header !== serviceOptions.authorizationPassword) {
                             // Incorrect or no custom header
                             if (!isLastType) return;
                             log(2, `[AUTH] IP ${ipFormatted} tried to reach ${hostname} which requires authorization`);
@@ -213,12 +255,12 @@ proxyServer.on("connection", proxyConnection => {
             }
 
             // Is redirect
-            if (serverOptions.redirect) {
-                return proxyConnection.end(`${version} 301 Moved Permanently\r\nLocation: ${serverOptions.redirect}\r\n\r\n`);
+            if (serviceOptions.redirect) {
+                return proxyConnection.end(`${version} 301 Moved Permanently\r\nLocation: ${serviceOptions.redirect}\r\n\r\n`);
             }
 
             // Modify headers
-            Object.entries(serverOptions.modifiedHeaders || {}).forEach(([header, value]) => {
+            Object.entries(serviceOptions.modifiedHeaders || {}).forEach(([header, value]) => {
                 if (value === true) return;
 
                 if (!value) {
@@ -226,10 +268,10 @@ proxyServer.on("connection", proxyConnection => {
                 } else
                     setHeader(headers, header, formatString(value, {
                         proxyHostname: hostname, // OLD
-                        serverHostname: serverOptions.serverHostname, // OLD
-                        serverPort: serverOptions.serverPort, // OLD
+                        serverHostname: serviceOptions.serverHostname, // OLD
+                        serverPort: serviceOptions.serverPort, // OLD
                         hostname,
-                        serverOptions,
+                        serverOptions: serviceOptions,
                         headers,
                         ip
                     }));
@@ -237,7 +279,7 @@ proxyServer.on("connection", proxyConnection => {
 
             // Is bypassed URI
             // TODO: make this better
-            const bypassOptions = serverOptions.uriBypass?.[uri];
+            const bypassOptions = serviceOptions.uriBypass?.[uri];
             if (bypassOptions) {
                 const bypassHeaders = objectDefaults(bypassOptions.headers, { "Content-Length": bypassOptions.data.length || 0 });
                 return proxyConnection.write(`${version} ${bypassOptions.statusCode || 200} ${bypassOptions.statusMessage || ""}\r\n${Object.entries(bypassHeaders).map(i => `${i[0]}: ${i[1]}`).join("\r\n")}\r\n\r\n${bypassOptions.data || ""}`);
@@ -245,7 +287,7 @@ proxyServer.on("connection", proxyConnection => {
 
             // Reconstruct data
             const reconstructedData = Buffer.concat([
-                Buffer.from(`${method} ${serverOptions.forceUri || uri} ${version}`), // Request line
+                Buffer.from(`${method} ${serviceOptions.forceUri || uri} ${version}`), // Request line
                 Buffer.from("\r\n"), // New line
                 Buffer.from(Object.entries(headers).map(i => `${i[0]}: ${i[1]}`).join("\r\n")), // Headers
                 Buffer.from("\r\n\r\n"), // New line before data
@@ -256,13 +298,13 @@ proxyServer.on("connection", proxyConnection => {
 
             if (!serverConnection) {
                 // Connect to server
-                log(3, `[CONNECTING] IP ${ipFormatted} connecting to ${hostname}`);
+                log(3, `CONNECTING IP ${ipFormatted} connecting to ${hostname}`);
 
-                serverConnection = (serverOptions.useTls ? tls : net).connect({
-                    host: serverOptions.serverHostname,
-                    port: serverOptions.serverPort,
+                serverConnection = (serviceOptions.useTls ? tls : net).connect({
+                    host: serviceOptions.serverHostname,
+                    port: serviceOptions.serverPort,
                     rejectUnauthorized: false,
-                    ...serverOptions.additionalServerOptions
+                    ...serviceOptions.additionalServerOptions
                 });
 
                 // Server events
@@ -298,7 +340,7 @@ proxyServer.on("connection", proxyConnection => {
 });
 
 // Listen
-proxyServer.listen(config.port, config.hostname, () => log(0, `Proxy server listening at :${config.port}`));
+proxyServer.listen(proxyConfig.port, proxyConfig.hostname, () => log(0, `Proxy server listening at :${proxyConfig.port}`));
 
 // Close
 process.on("SIGINT", closeProxy);
@@ -307,10 +349,7 @@ process.on("SIGTERM", closeProxy);
 function closeProxy() {
     log(0, "Closing proxy");
     proxyServer.close();
-    global.unwatchConfig?.();
-    global.unwatchServers?.();
-    global.unwatchAuthorizationHtml?.();
-    global.unwatchDefaultWhitelist?.();
-    global.unwatchDefaultBlacklist?.();
+    unwatchAll();
+    services.unwatch();
     process.exit(0);
 }
