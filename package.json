@@ -1,0 +1,7 @@
+{
+    "name": "reverse-proxy",
+    "version": "1.0.0",
+    "bin": {
+      "reverseproxy": "index.js"
+    }
+  }

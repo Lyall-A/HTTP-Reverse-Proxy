@@ -1,6 +1,0 @@
-<script>
-    let authorization;
-    while (!authorization) authorization = prompt("Authorization required");
-    document.cookie = `%{authorizationCookie}=${password.value}; path=/${"%{cookieMaxAge}" ? `; max-age=%{cookieMaxAge}` : ""}`;
-    location.reload();
-</script>
