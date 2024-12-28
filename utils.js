@@ -379,7 +379,80 @@ function defaults(defaults, options) {
     return defaults;
   }
 
+/**
+ * LogFlag
+ * A lightweight logging utility that supports dynamic log level management using bitmasks.
+ * @param {string[]} [levels=['ERROR', 'WARN', 'DEBUG', 'INFO', 'VERBOSE']] - The log levels available to use.
+ * @returns {Object} - The logger level object with flags used for managing log levels.
+ * @example
+ * const LOG = LogFlag();
+ * LOG.setLevel(LOG.levels.VERBOSE);
+ * 
+ * LOG.INFO && console.log('Hello world');
+ * LOG.WARN && console.warn('Warning message');
+ */
+function LogFlag(levels = ['ERROR', 'WARN', 'DEBUG', 'INFO', 'VERBOSE']) {
+    const LOG = Object.create({
+        /**
+         * Defines the log available to use.
+         * @param {string[]} levelNames - Array of log level names.
+         */
+        defineLevels(levelNames) {
+            this.levels = {};
+            let bitmask = 0x1;
+            for (const name of levelNames) {
+                this.levels[name] = bitmask;
+                Object.defineProperty(this, name, {
+                    value: false,
+                    writable: true,
+                    enumerable: true,
+                });
+                bitmask <<= 1;
+            }
+            this.levels.NONE = 0;
+            this.levels.ALL = (bitmask - 1);
+            this.enableLevels(this.levels.ALL); // Default to all levels enabled
+            return this.levels;
+        },
+        /**
+         * Enables all log levels up to and including the specified level.
+         * @param {number} level - The bitmask of the log level up to which levels are enabled.
+         * @example LOG.enableLevels(LOG.levels.INFO)
+         */
+        setLevel(level) {
+            return this.enableLevels(level - 1 | level);
+        },
+        /**
+         * Enables specific log levels based on the provided bitmask.
+         * @param {number} levelsBitmask - Bitmask representing the log levels to enable.
+         * @example LOG.enableLevels(LOG.levels.ERROR | LOG.levels.WARN | LOG.levels.VERBOSE)
+         */
+        enableLevels(levelsBitmask) {
+            Object.keys(this).forEach(LEVEL => {
+                this[LEVEL] = Boolean(levelsBitmask & this.levels[LEVEL]);
+            });
+            return this.currentLevel = levelsBitmask;
+        },
+        /**
+         * Logs a message if the specified log level is enabled.
+         * @param {number} level - The bitmask of the log level.
+         * @param {string} message - The message to log.
+         */
+        log(level, ...args) {
+            (this.currentLevel & level) && console.log(...args);
+        },
+    },
+    {
+        levels: { value: {}, writable: true, enumerable: false },
+        currentLevel: { value: 0x0, writable: true, enumerable: false },
+    });
+
+    LOG.defineLevels(levels);
+    return LOG;
+}
+
 module.exports = {
+    LogFlag,
     readJson,
     parseTxtFile,
     log,
