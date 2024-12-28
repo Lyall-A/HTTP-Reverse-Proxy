@@ -25,7 +25,7 @@ function parseTxtFile(fileContent) {
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         // Skip empty lines or comments
-        if (line && !(line.startsWith('//') && line.startsWith('#'))) {
+        if (line && !(line.startsWith('//') || line.startsWith('#'))) {
             parsedLines.push(line);
         }
     }
@@ -47,7 +47,7 @@ function log(level, ...msg) {
  * @param {any} err Error to log
  */
 function logProxyError(err) {
-    if (!config.ignoreErrors && !config.ignoreProxyErrors) console.error(`[${timestamp()}]`, "[PROXY ERROR]", err);
+    if (!config.ignoreErrors && !config.ignoreProxyErrors) console.error(timestamp(), "[PROXY ERROR]", err);
 }
 
 /**
@@ -55,7 +55,7 @@ function logProxyError(err) {
  * @param {any} err Error to log
  */
 function logServerError(err) {
-    if (!config.ignoreErrors && !config.ignoreServerErrors) console.error(`[${timestamp()}]`, "[SERVER ERROR]", err);
+    if (!config.ignoreErrors && !config.ignoreServerErrors) console.error(timestamp(), "[SERVER ERROR]", err);
 }
 
 /**
@@ -180,13 +180,13 @@ function watch(filepath, callback) {
     const listener = () => {
         if (isJson) {
             try {
-                callback(readJson(filepath));
+                callback(readJson(filepath), filepath);
             } catch (err) {
                 console.error(`Failed to read '${filepath}', error:`, err);
             }
         } else {
             try {
-                callback(fs.readFileSync(filepath, "utf-8"));
+                callback(fs.readFileSync(filepath, "utf-8"), filepath);
             } catch (err) {
                 console.error(`Failed to read '${filepath}', error:`, err);
             }
@@ -258,43 +258,42 @@ function createLiveFileMap(globPattern, onRead) {
             if (eventType === 'rename') {
                 if (fs.existsSync(fullPath)) {
                     if (filename.endsWith(`.${fileExtension}`) && !filename.startsWith('_')) {
+                        // console.log(`File added or updated: ${filename}`);
                         const key = path.basename(filename, `.${fileExtension}`);
                         try {
                             let fileContent = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
                             if (onRead) fileContent = onRead(fileContent, key, filename);
                             map.set(key, fileContent);
-                            console.log(`File added or updated: ${filename}`);
                         } catch (err) {
                             console.error(`Error reading JSON from ${fullPath}:`, err);
                         }
                     }
                 } else {
+                    // console.log(`File removed: ${filename}`);
                     const key = path.basename(filename, `.${fileExtension}`);
                     map.delete(key);
-                    console.log(`File removed: ${filename}`);
                 }
             } else if (eventType === 'change') {
                 if (filename.endsWith(`.${fileExtension}`) && !filename.startsWith('_')) {
+                    // console.log(`File changed: ${filename}`);
                     const key = path.basename(filename, `.${fileExtension}`);
                     try {
                         let fileContent = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
                         if (onRead) fileContent = onRead(fileContent, key, filename);
                         map.set(key, fileContent);
-                        console.log(`File changed: ${filename}`);
                     } catch (err) {
                         console.error(`Error reading JSON from ${fullPath}:`, err);
                     }
                 }
             }
         });
-
-        console.log('Watcher started.');
+        // console.log('Watcher started.', watchDirectory);
     }
 
     function unwatch() {
         if (map.watcher) {
             map.watcher.close();
-            console.log('Watcher stopped.');
+            // console.log('Watcher stopped.');
         }
     }
 
@@ -323,9 +322,8 @@ function getHeader(headers, name) {
  */
 function setHeader(headers, name, value) {
     const key = Object.keys(headers).find(i => i.toLowerCase() === name.toLowerCase());
-    value ?
-        headers[key || name] = value :
-        delete headers[key || name];
+    if (value) headers[key || name] = value;
+    else delete headers[key || name];
 }
 
 /**
@@ -334,16 +332,7 @@ function setHeader(headers, name, value) {
  */
 function timestamp() {
     const date = new Date();
-
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear().toString().padStart(2, "0");
-
-    const hour = date.getHours().toString().padStart(2, "0");
-    const minute = date.getMinutes().toString().padStart(2, "0");
-    const second = date.getSeconds().toString().padStart(2, "0");
-
-    return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+    return `[${date.toLocaleString()}]\t`;
 }
 
 /**
@@ -377,7 +366,7 @@ function defaults(defaults, options) {
       }
     }
     return defaults;
-  }
+}
 
 /**
  * LogFlag
