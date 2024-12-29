@@ -1,0 +1,16 @@
+{
+    "port": 80,
+    "hostname": null,
+    "loggingLevel": 2,
+    "ignoreErrors": true,
+    "tls": false,
+    "key": null,
+    "cert": null,
+
+    "whitelist": "ip-whitelist.conf",
+    "blacklist": null,
+    
+    "additionalProxyServerOptions": {
+        
+    }
+}
