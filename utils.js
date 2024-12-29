@@ -440,6 +440,20 @@ function LogFlag(levels = ['ERROR', 'WARN', 'DEBUG', 'INFO', 'VERBOSE']) {
     return LOG;
 }
 
+function copyRecursiveSync(src, dest) {
+    const stats = fs.statSync(src);
+    if (stats.isDirectory()) {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest);
+        }
+        fs.readdirSync(src).forEach(childItem => {
+            copyRecursiveSync(path.join(src, childItem), path.join(dest, childItem));
+        });
+    } else {
+        fs.copyFileSync(src, dest);
+    }
+}
+
 module.exports = {
     LogFlag,
     readJson,
@@ -462,4 +476,5 @@ module.exports = {
     setHeader,
     timestamp,
     defaults,
+    copyRecursiveSync,
 };

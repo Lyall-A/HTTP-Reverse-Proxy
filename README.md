@@ -26,7 +26,7 @@ Pre-configured to work behind Cloudflare proxy and disallow robots
     ```
 3. Create a new server
     ```sh
-    reverseproxy init
+    reverseproxy create
     ```
 4. Edit files (see readme inside folder for instructions)
 5. Start the proxy running

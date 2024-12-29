@@ -25,6 +25,7 @@ const {
     setHeader,
     timestamp,
     defaults,
+    copyRecursiveSync,
 } = require("./utils");
 
 const CLINAME = 'proxy-cli';
@@ -49,7 +50,7 @@ function main() {
         displayHelp();
         process.exit(0);
     }
-    else if (command === "init") {
+    else if (command === "create") {
         scaffoldServer();
     }
     else if (command === "start") {
@@ -64,31 +65,17 @@ function main() {
 
 function displayHelp() {
     console.log(`
-    Usage: ${CLINAME} <command>
-    
-    Commands:
-    start   Start the proxy server
-    init    Initialize a new server setup
-    --help  Show this help message
+        Usage: ${CLINAME} <command>
+
+        Commands:
+            start   Start the proxy server
+            create  Scaffolds a new server setup in an empty folder
+            --help  Show this help message
     `);
 }
 
-function copyRecursiveSync(src, dest) {
-    const stats = fs.statSync(src);
-    if (stats.isDirectory()) {
-        if (!fs.existsSync(dest)) {
-            fs.mkdirSync(dest);
-        }
-        fs.readdirSync(src).forEach(childItem => {
-            copyRecursiveSync(path.join(src, childItem), path.join(dest, childItem));
-        });
-    } else {
-        fs.copyFileSync(src, dest);
-    }
-}
-
 function scaffoldServer() {
-    console.log("Initializing new server...");
+    console.log("Scaffolding new server...");
 
     if (!fs.existsSync(EXAMPLE_DIR)) {
         console.error("Example directory not found:", EXAMPLE_DIR);
@@ -119,10 +106,11 @@ function scaffoldServer() {
         console.log(`Copied: ${file}`);
     });
 
-    console.log("Server initialization complete.");
-    console.log("");
-    console.log(`Edit files and use the command $ ${CLINAME} start`);
+    console.log("Server scaffolding complete.\n");
+    console.log(" - Edit files, see readme file for instructions");
+    console.log(` - To start the server run \`${CLINAME} start\``);
 }
+
 
 function startProxy() {
     console.log("Starting proxy server...");
@@ -162,19 +150,18 @@ function startProxy() {
     });
     services.watch();
 
-    // Create proxy server
+    // Start proxy server
     proxyServer = (proxyConfig.tls ? tls : net).createServer({
         key: fs.existsSync(proxyConfig.key) ? fs.readFileSync(proxyConfig.key) : undefined,
         cert: fs.existsSync(proxyConfig.cert) ? fs.readFileSync(proxyConfig.cert) : undefined,
         ...proxyConfig.additionalProxyServerOptions
     });
-
     proxyServer.on("connection", connectionHandler);
     proxyServer.listen(proxyConfig.port, proxyConfig.hostname, () => {
-        console.log("Proxy server started.");
+        console.log(timestamp(), "Proxy server started.");
         displaySummary();
     });
-
+    
     process.on("SIGINT", closeProxy);
     process.on("SIGTERM", closeProxy);
 }
@@ -221,6 +208,7 @@ function displaySummary() {
     console.log(`\n${'='.repeat(80)}\n`);
     console.log(timestamp(), 'Proxy started...');
 }
+
 
 function connectionHandler(proxyConnection) {
     const ip = proxyConnection.remoteAddress?.split("::ffff:")[1] || proxyConnection.remoteAddress;
@@ -461,10 +449,6 @@ function connectionHandler(proxyConnection) {
     function writeServerConnection(data) { if (serverConnection && !serverConnection.ended) if (!serverConnection.write(data)) proxyConnection.pause() }
     function writeProxyConnection(data) { if (proxyConnection && !proxyConnection.ended) if (!proxyConnection.write(data)) serverConnection.pause() }
 }
-
-// Close
-process.on("SIGINT", closeProxy);
-process.on("SIGTERM", closeProxy);
 
 function closeProxy() {
     LOG.INFO && console.log(timestamp(), "Shutting down proxy...");
