@@ -1,0 +1,20 @@
+{
+    "proxyHostnames": ["www.example.com", "site.example.com"],
+    "serverHostname": "127.0.0.1",
+    "serverPort": 80,
+    "authorization": false,
+    "authorizationType": "www-authenticate",
+    "authorizationPassword": "password",
+    "rememberIp": true,
+    "useTls": false,
+    "modifiedHeaders": { },
+    "additionalServerOptions": { },
+    "uriBypass": {
+        "/robots.txt": {
+            "statusCode": 200,
+            "statusMessage": "OK",
+            "headers": { "Content-Type": "text/plain" },
+            "data": "User-agent: *\nDisallow: /"
+        }
+    }
+}

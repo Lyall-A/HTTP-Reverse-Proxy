@@ -1,0 +1,9 @@
+{
+    "proxyHostnames": ["chat.example.com", "chat.example.net"],
+    "serverHostname": "10.0.0.11",
+    "serverPort": 3000,
+    "authorization": true,
+    "authorizationType": "cookies",
+    "authorizationPassword": "password",
+    "useTls": true
+}
