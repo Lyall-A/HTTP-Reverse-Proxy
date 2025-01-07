@@ -51,7 +51,8 @@ function log(level, ...msg) {
  * @param {any} err Error to log
  */
 function logProxyError(err) {
-    if (!config.ignoreErrors && !config.ignoreProxyErrors) console.error(timestamp(), "[PROXY ERROR]", err);
+    // if (!config.ignoreErrors && !config.ignoreProxyErrors)
+        console.error(timestamp(), "[PROXY ERROR]", err);
 }
 
 /**
@@ -59,7 +60,8 @@ function logProxyError(err) {
  * @param {any} err Error to log
  */
 function logServerError(err) {
-    if (!config.ignoreErrors && !config.ignoreServerErrors) console.error(timestamp(), "[SERVER ERROR]", err);
+    // if (!config.ignoreErrors && !config.ignoreServerErrors)
+        console.error(timestamp(), "[SERVER ERROR]", err);
 }
 
 /**
