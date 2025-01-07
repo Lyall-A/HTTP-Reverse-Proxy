@@ -9,9 +9,6 @@ const {
     LogFlag,
     readJson,
     parseTxtFile,
-    log,
-    logProxyError,
-    logServerError,
     ipMatch,
     getHeaders,
     findService,
@@ -26,6 +23,7 @@ const {
     timestamp,
     defaults,
     copyRecursiveSync,
+    dedent,
 } = require("./utils");
 
 const CLINAME = 'proxy-cli';
@@ -53,6 +51,7 @@ function main() {
     }
     else if (command === "create") {
         scaffoldServer();
+        process.exit(0);
     }
     else if (command === "start") {
         startProxy();
@@ -79,7 +78,7 @@ function scaffoldServer() {
     console.log("Scaffolding new server...");
 
     if (!fs.existsSync(EXAMPLE_DIR)) {
-        console.error("Example directory not found:", EXAMPLE_DIR);
+        console.error("Error! The Example directory doesn't exist.", EXAMPLE_DIR);
         process.exit(1);
     }
 
@@ -87,8 +86,7 @@ function scaffoldServer() {
     fs.readdirSync(EXAMPLE_DIR).forEach(file => {
         const src = path.join(EXAMPLE_DIR, file);
         const dest = path.join(process.cwd(), file);
-
-        if (['.DS_Store'].includes(file)) return;
+        if (['.DS_Store', 'Thumbs.db', 'desktop.ini'].includes(file)) return;
         if (fs.existsSync(dest) && !fs.statSync(dest).isDirectory()) {
             console.warn(`File already exists and would be overwritten: ${file}`);
             conflict = true;
@@ -96,7 +94,7 @@ function scaffoldServer() {
     });
 
     if (conflict) {
-        console.log(`Aborted. Resolve conflicts before running init.`);
+        console.log(`Aborted.`);
         return;
     }
 
@@ -161,8 +159,8 @@ function startProxy() {
     });
     proxyServer.on("connection", connectionHandler);
     proxyServer.listen(proxyConfig.port, proxyConfig.hostname, () => {
-        console.log(timestamp(), "Proxy server started.");
         displaySummary();
+        LOG.INFO && console.log(timestamp(), 'Proxy started...');
     });
     
     process.on("SIGINT", closeProxy);
@@ -170,46 +168,38 @@ function startProxy() {
 }
 
 function displaySummary() {
-    console.log('='.repeat(80));
-    console.log("  REVERSE PROXY SERVER SUMMARY");
-    console.log('='.repeat(80));
-    console.log('');
+    console.log(dedent(`
+        ================================================================================
+          REVERSE PROXY SERVER SUMMARY
+        ================================================================================
 
-    console.log(`Proxy Listening on:`);
-    console.log(`  Hostname: ${proxyConfig.hostname || "0.0.0.0"}`);
-    console.log(`  Port: ${proxyConfig.port || 80}`);
-    console.log(`TLS: ${proxyConfig.tls ? "Enabled" : "Not enabled"}`);
-    if (proxyConfig.tls) {
-        console.log(`  - Key: ${proxyConfig.key || "Not Provided"}`);
-        console.log(`  - Certificate: ${proxyConfig.cert || "Not Provided"}`);
-    }
-    console.log(`Logging Level: ${LOG.currentLevel}`);
-    console.log(`Ignore Errors: ${proxyConfig.ignoreErrors ? "Yes" : "No"}\n`);
+        Proxy Listening on:
+          Hostname: ${proxyConfig.hostname || "0.0.0.0"}
+          Port: ${proxyConfig.port || 80}
+          
+          TLS: ${proxyConfig.tls ? "Enabled" : "Not enabled"}
+            - Key: ${proxyConfig.key || "Not Provided"}
+            - Certificate: ${proxyConfig.cert || "Not Provided"}
+        
+        Logging Level: ${LOG.currentLevel}
+        Ignore Errors: ${proxyConfig.ignoreErrors ? "Yes" : "No"}
 
-    if (globalWhitelist) {
-        console.log(`Global Whitelist: ${globalWhitelist.length} entries`);
-    } else {
-        console.log(`Global Whitelist: Not Configured`);
-    }
+        Global Whitelist: ${globalWhitelist?.length ?? 'Not Configured'} entries
+        Global Blacklist: ${globalBlacklist?.length ?? 'Not Configured'} entries
 
-    if (globalBlacklist) {
-        console.log(`Global Blacklist: ${globalBlacklist.length} entries`);
-    } else {
-        console.log(`Global Blacklist: Not Configured`);
-    }
-
-    console.log(`\n Registered Services: (${services.size} services)`);
-    console.log('-'.repeat(80));
+        Registered Services: (${services.size} services)
+        --------------------------------------------------------------------------------
+    `));
     services.forEach((service, key) => {
-        console.log(`\n${key}:`);
-        console.log(`  Hostnames: ${service.proxyHostnames.join(", ")}`);
-        console.log(`  Target:    ${service.serverHostname}:${service.serverPort}`);
-        console.log(`  TLS:       ${service.useTls ? "Yes" : "No"}`);
-        console.log(`  Auth:      ${service.authorization ? service.authorizationType : "None"}`);
+        console.log(dedent(`
+            ${key}:
+              Hostnames: ${service.proxyHostnames.join(", ")}
+              Target:    ${service.serverHostname}:${service.serverPort}
+              TLS:       ${service.useTls ? "Yes" : "No"}
+              Auth:      ${service.authorization ? service.authorizationType : "None"}
+        `));
     });
-
-    console.log(`\n${'='.repeat(80)}\n`);
-    console.log(timestamp(), 'Proxy started...');
+    console.log('='.repeat(80));
 }
 
 
@@ -427,7 +417,7 @@ function connectionHandler(proxyConnection) {
                 serverConnection.on("end", i => closeProxyConnection);
                 serverConnection.on("error", err => {
                     closeProxyConnection();
-                    logServerError(err);
+                    LOG.ERROR && console.error(timestamp(), "[PROXY ERROR]", err);
                 });
 
                 serverConnection.on("drain", () => proxyConnection.resume());
@@ -443,7 +433,7 @@ function connectionHandler(proxyConnection) {
     proxyConnection.on("end", closeServerConnection);
     proxyConnection.on("error", err => {
         closeServerConnection();
-        logProxyError(err);
+        LOG.ERROR && console.error(timestamp(), "[PROXY ERROR]", err);
     });
     proxyConnection.on("drain", () => serverConnection?.resume());
 

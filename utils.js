@@ -37,34 +37,6 @@ function parseTxtFile(fileContent) {
 }
 
 /**
- * Log
- * @param {number} level Logging level
- * @param  {...any} msg Message to log
- */
-function log(level, ...msg) {
-    //if (typeof LOGLEVEL !=='undefined' && LOGLEVEL >= level)
-    console.log(`[${timestamp()}]`, ...msg);
-}
-
-/**
- * Log proxy error
- * @param {any} err Error to log
- */
-function logProxyError(err) {
-    // if (!config.ignoreErrors && !config.ignoreProxyErrors)
-        console.error(timestamp(), "[PROXY ERROR]", err);
-}
-
-/**
- * Log server error
- * @param {any} err Error to log
- */
-function logServerError(err) {
-    // if (!config.ignoreErrors && !config.ignoreServerErrors)
-        console.error(timestamp(), "[SERVER ERROR]", err);
-}
-
-/**
  * Matches IP
  * @param {string} ip IP to match
  * @param {object} matches Array of IP's or CIDR's to match with
@@ -179,13 +151,13 @@ class FileWatcher {
         this.watchers = new Map();
     }
 
-/**
- * Watches for file changes
- * @param {string} filepath File path to watch
+    /**
+     * Watches for file changes
+     * @param {string} filepath File path to watch
      * @param {function} onChange Callback for when file is changed
- */
+     */
     watch(filepath, onChange) {
-    const isJson = filepath.endsWith('.json');
+        const isJson = filepath.endsWith('.json');
         const handler = () => {
             try {
                 let data = fs.readFileSync(filepath, "utf-8");
@@ -198,30 +170,30 @@ class FileWatcher {
 
         if (!this.watchers.has(filepath)) {
             this.watchers.set(filepath, []);
-    }
+        }
         fs.watchFile(filepath, handler);
         this.watchers.get(filepath).push(handler);
         handler(); // call onChange on init
-}
+    }
 
-/**
- * Stops watching a specific file
- * @param {string} filepath File path to unwatch
- */
+    /**
+     * Stops watching a specific file
+     * @param {string} filepath File path to unwatch
+     */
     unwatch(filepath) {
         if (this.watchers.has(filepath)) {
             const listeners = this.watchers.get(filepath);
-        listeners.forEach(listener => fs.unwatchFile(filepath, listener));
+            listeners.forEach(listener => fs.unwatchFile(filepath, listener));
             this.watchers.delete(filepath);
+        }
     }
-}
 
-/**
- * Stops watching all files
- */
+    /**
+     * Stops watching all files
+     */
     unwatchAll() {
         for (const [filepath, listeners] of this.watchers.entries()) {
-        listeners.forEach(listener => fs.unwatchFile(filepath, listener));
+            listeners.forEach(listener => fs.unwatchFile(filepath, listener));
         }
         this.watchers.clear();
     }
@@ -458,15 +430,24 @@ function copyRecursiveSync(src, dest) {
     }
 }
 
+/**
+ * Removes the indentation of multiline strings
+ * @param  {string} str A template literal string
+ * @return {string} A string without the indentation
+ */
+function dedent(str) {
+    str = str.replace(/^[ \t]*\r?\n/, ''); // remove leading blank line
+    var indent = /^[ \t]+/m.exec(str); // detected indent
+    if (indent) str = str.replace(new RegExp('^' + indent[0], 'gm'), ''); // remove indent
+    return str.replace(/(\r?\n)[ \t]+$/, '$1'); // remove trailling blank line
+};
+
 module.exports = {
     requestLineRegex,
     hostnameRegex,
     LogFlag,
     readJson,
     parseTxtFile,
-    log,
-    logProxyError,
-    logServerError,
     ipMatch,
     getHeaders,
     findService,
@@ -481,4 +462,5 @@ module.exports = {
     timestamp,
     defaults,
     copyRecursiveSync,
+    dedent,
 };
