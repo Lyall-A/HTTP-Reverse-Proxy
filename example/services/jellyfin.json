@@ -2,7 +2,7 @@
     "proxyHostnames": ["jellyfin.mydomain.com", "movies.example.com"],
     "serverHostname": "127.0.0.1",
     "serverPort": 8096,
-    "authorization": true,
+    "authorization": false,
     "authorizationType": "www-authenticate",
     "authorizationPassword": "password",
     "rememberIp": true,

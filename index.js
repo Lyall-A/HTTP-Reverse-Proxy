@@ -4,6 +4,8 @@ const tls = require("tls");
 const path = require('path');
 const fs = require("fs");
 const {
+    requestLineRegex,
+    hostnameRegex,
     LogFlag,
     readJson,
     parseTxtFile,

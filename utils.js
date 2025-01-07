@@ -3,6 +3,10 @@ const path = require("path");
 
 const headersRegex = /^(.*?): ?(.*)$/m; // Host: localhost
 
+// Regex
+const requestLineRegex = /^(.*) (.*) (HTTP\/\d*\.\d*)$/im; // GET /hello/world HTTP/1.1
+const hostnameRegex = /[^:]*/; // localhost (excludes port)
+
 /**
  * Get JSON from file path
  * @param {string} filePath File path
@@ -455,6 +459,8 @@ function copyRecursiveSync(src, dest) {
 }
 
 module.exports = {
+    requestLineRegex,
+    hostnameRegex,
     LogFlag,
     readJson,
     parseTxtFile,
