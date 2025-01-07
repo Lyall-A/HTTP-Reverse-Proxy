@@ -315,7 +315,7 @@ function connectionHandler(proxyConnection) {
                             // Incorrect or no authorization cookie
                             if (!isLastType) return;
                             const vars = {
-                                config,
+                                config: proxyConfig,
                                 serverOptions: serviceOptions,
                                 cookieMaxAge: serviceDefaults.cookieMaxAge,
                                 authorizationCookie: serviceOptions.authorizationCookie,
