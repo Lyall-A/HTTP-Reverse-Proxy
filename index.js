@@ -19,9 +19,7 @@ const {
     parseCookies,
     stringifyCookies,
     objectDefaults,
-    watch,
-    unwatch,
-    unwatchAll,
+    FileWatcher,
     createLiveFileMap,
     getHeader,
     setHeader,
@@ -33,10 +31,11 @@ const {
 const CLINAME = 'proxy-cli';
 
 // Global variables
-let proxyServer;
-let proxyConfig = {};
-let serviceDefaults = {};
-let services = new Map();
+let proxyServer;            // proxy server instance
+let proxyConfig = {};       // Proxy global config (config.json)
+let serviceDefaults = {};   // Services default config (services/_defaults.json)
+let fw = new FileWatcher(); // used to watch global files (config, html, ip lists)
+let services = new Map();   // used to watch services/*.json, but they are dynamically maped to this map (live reloaded, included, removed)
 let globalWhitelist;
 let globalBlacklist;
 
@@ -113,18 +112,17 @@ function scaffoldServer() {
     console.log(` - To start the server run \`${CLINAME} start\``);
 }
 
-
 function startProxy() {
     console.log("Starting proxy server...");
 
     // Proxy Configuration
-    watch("config.json", (json, filename) => {
+    fw.watch("config.json", (json, filename) => {
         LOG.INFO && console.log(timestamp(), `Loaded Proxy Config (${filename})`);
         proxyConfig = json;
     });
 
     // Auth page html
-    watch(path.join(__dirname, "authorization.html"), file => {
+    fw.watch(path.join(__dirname, "authorization.html"), file => {
         defaultAuthorizationHtmlFile = file;
         LOG.INFO && console.log(timestamp(), "Loaded authorization HTML");
     });
@@ -140,12 +138,15 @@ function startProxy() {
     });
 
     // Defaults for services
-    watch("./services/_defaults.json", (json, filename) => {
+    fw.watch("./services/_defaults.json", (json, filename) => {
         LOG.INFO && console.log(timestamp(), `Loaded serviceDefaults config (${filename})`);
         serviceDefaults = json;
     });
 
-    // Live load services
+    // Dynamically load services into a map that is live reloaded
+    // This map will include al json files into that folder,
+    // the map will be modified automatically if files are added removed or the content changes
+    // the file name is used as a key to that json (parsed) without extension
     services = createLiveFileMap('./services/*.json', (service, key, filename) => {
         LOG.INFO && console.log(timestamp(), "Loaded service:", key);
         return service;
@@ -456,7 +457,7 @@ function closeProxy() {
     LOG.INFO && console.log(timestamp(), "Shutting down proxy...");
     proxyServer.close();
     services.unwatch();
-    unwatchAll();
+    fw.unwatchAll();
     LOG.INFO && console.log(timestamp(), "Stopped.");
     process.exit(0);
 }

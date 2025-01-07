@@ -174,59 +174,57 @@ function objectDefaults(obj, def) {
     })();
 }
 
-const watchers = new Map();
+class FileWatcher {
+    constructor() {
+        this.watchers = new Map();
+    }
 
 /**
  * Watches for file changes
  * @param {string} filepath File path to watch
- * @param {function} callback Callback for when file is changed
+     * @param {function} onChange Callback for when file is changed
  */
-function watch(filepath, callback) {
+    watch(filepath, onChange) {
     const isJson = filepath.endsWith('.json');
-    const listener = () => {
-        if (isJson) {
+        const handler = () => {
             try {
-                callback(readJson(filepath), filepath);
+                let data = fs.readFileSync(filepath, "utf-8");
+                if (isJson) data = JSON.parse(data);
+                onChange(data, filepath);
             } catch (err) {
                 console.error(`Failed to read '${filepath}', error:`, err);
             }
-        } else {
-            try {
-                callback(fs.readFileSync(filepath, "utf-8"), filepath);
-            } catch (err) {
-                console.error(`Failed to read '${filepath}', error:`, err);
-            }
-        }
-    };
+        };
 
-    if (!watchers.has(filepath)) {
-        watchers.set(filepath, []);
+        if (!this.watchers.has(filepath)) {
+            this.watchers.set(filepath, []);
     }
-    fs.watchFile(filepath, listener);
-    watchers.get(filepath).push(listener);
-    listener(); // call once
+        fs.watchFile(filepath, handler);
+        this.watchers.get(filepath).push(handler);
+        handler(); // call onChange on init
 }
 
 /**
  * Stops watching a specific file
  * @param {string} filepath File path to unwatch
  */
-function unwatch(filepath) {
-    if (watchers.has(filepath)) {
-        const listeners = watchers.get(filepath);
+    unwatch(filepath) {
+        if (this.watchers.has(filepath)) {
+            const listeners = this.watchers.get(filepath);
         listeners.forEach(listener => fs.unwatchFile(filepath, listener));
-        watchers.delete(filepath);
+            this.watchers.delete(filepath);
     }
 }
 
 /**
  * Stops watching all files
  */
-function unwatchAll() {
-    for (const [filepath, listeners] of watchers.entries()) {
+    unwatchAll() {
+        for (const [filepath, listeners] of this.watchers.entries()) {
         listeners.forEach(listener => fs.unwatchFile(filepath, listener));
+        }
+        this.watchers.clear();
     }
-    watchers.clear();
 }
 
 function createLiveFileMap(globPattern, onRead) {
@@ -476,9 +474,7 @@ module.exports = {
     parseCookies,
     stringifyCookies,
     objectDefaults,
-    watch,
-    unwatch,
-    unwatchAll,
+    FileWatcher,
     createLiveFileMap,
     getHeader,
     setHeader,
