@@ -239,12 +239,12 @@ function connectionHandler(proxyConnection) {
 
     // Global Blacklist
     if (globalBlacklist && ipMatch(ip, globalBlacklist)) {
-        LOG.CONNECTION_REFUSED && console.log(timestamp(), ip, `[CONNECTION_BLOCKED_BLACKLISTED] Blacklisted attempted to connect!`);
+        LOG.CONNECTION_REFUSED && console.log(timestamp(), `🖥 ${ip}`, `[CONNECTION_BLOCKED_BLACKLISTED] Blacklisted attempted to connect!`);
         return proxyConnection.destroy();
     }
     // Global Whitelist
     if (globalWhitelist && !ipMatch(ip, globalWhitelist)) {
-        LOG.CONNECTION_REFUSED && console.log(timestamp(), ip, `[CONNECTION_BLOCKED_UNWHITELISTED] Unwhitelisted attempted to connect!`);
+        LOG.CONNECTION_REFUSED && console.log(timestamp(), `🖥 ${ip}`, `[CONNECTION_BLOCKED_UNWHITELISTED] Unwhitelisted attempted to connect!`);
         return proxyConnection.destroy();
     }
 
@@ -263,7 +263,7 @@ function connectionHandler(proxyConnection) {
             const headers = getHeaders(splitHeaders);
 
             let realIp = serviceDefaults.realIpHeader ? headers[serviceDefaults.realIpHeader] : null;
-            let ipFormatted = realIp ? `🏛️${ip} 🖥${realIp}` : `🖥${ip}`;
+            let ipFormatted = realIp ? `🏛️ ${ip} 🖥 ${realIp}` : `🖥 ${ip}`;
 
             // Get hostname
             const [hostname] = getHeader(headers, "Host")?.match(hostnameRegex) || [];
@@ -284,7 +284,7 @@ function connectionHandler(proxyConnection) {
 
             // Get real IP (if using some sort of proxy like Cloudflare)
             realIp = serviceOptions.realIpHeader ? headers[serviceOptions.realIpHeader] : null;
-            ipFormatted = realIp ? `🏛️${ip} 🖥${realIp}` : `🖥${ip}`;
+            ipFormatted = realIp ? `🏛️ ${ip} 🖥 ${realIp}` : `🖥 ${ip}`;
 
             // Make sure using supported version
             if (serviceOptions.supportedVersions && !serviceOptions.supportedVersions.includes(version)) {
@@ -365,8 +365,8 @@ function connectionHandler(proxyConnection) {
                         LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_DENIED_COOKIE] Unauthoried. Serving login page`);
                         const vars = {
                             config: proxyConfig,
-                            serverOptions: serviceOptions,
-                            cookieMaxAge: serviceDefaults.cookieMaxAge,
+                            serviceOptions: serviceOptions,
+                            cookieMaxAge: serviceOptions.cookieMaxAge,
                             authorizationCookie: serviceOptions.authorizationCookie,
                             hostname,
                             ip: realIp || ip,
