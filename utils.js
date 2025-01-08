@@ -374,7 +374,7 @@ function LogFlag(levels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']) {
          * @example LOG.enableLevels(LOG.levels.INFO)
          */
         setLevel(level) {
-            if (typeof level !== 'number') throw new Error('Invalid argument! It should be reference (e.g.: LOG.ERROR) or a number.');
+            if (typeof level !== 'number') throw new Error(`Invalid argument (${level})! It should be reference (e.g.: LOG.ERROR) or a number.`);
             return this.enableLevels(level - 1 | level);
         },
         /**
@@ -383,7 +383,7 @@ function LogFlag(levels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']) {
          * @example LOG.enableLevels(LOG.levels.ERROR | LOG.levels.WARN | LOG.levels.VERBOSE)
          */
         enableLevels(levelsBitmask) {
-            if (typeof levelsBitmask !== 'number') throw new Error(`Argument is not a bitmask! It should be a number or a bitwise expression.`);
+            if (typeof levelsBitmask !== 'number') throw new Error(`Argument is not a bitmask! (${levelsBitmask}) It should be a number or a bitwise expression.`);
             Object.keys(this).forEach(LEVEL => {
                 this[LEVEL] = Boolean(levelsBitmask & this.levels[LEVEL]);
             });
@@ -395,8 +395,8 @@ function LogFlag(levels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']) {
          * @param {boolean} bool 
          */
         toggleLevel(levelName, bool) {
-            if (this.levels[levelName] === undefined) throw new Error('Argument is not a valid levelName!');
-            if (bool !== undefined) throw new Error('Argument bool must be a boolean');
+            if (this.levels[levelName] === undefined) throw new Error(`Argument is not a valid levelName! (${levelName})`);
+            if (bool !== undefined) throw new Error(`Argument bool must be a boolean! (${bool})`);
             this.enableLevels(bool ? (this.currentLevel | this.levels[levelName]) : (this.currentLevel & ~this.levels[levelName]));
         },
         /**
