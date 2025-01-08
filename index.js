@@ -138,11 +138,11 @@ function startProxy() {
         proxyConfig = json;
 
         // set log level
-        if (typeof proxyConfig.logLevel === 'number') {
-            LOG.setLevel(proxyConfig.logLevel);
-        }
-        else if (typeof proxyConfig.logLevel === 'object') {
-            Object.entries(proxyConfig.logLevel).forEach((level, b) => LOG.toggleLevel(level, b));
+        try {
+            if (typeof proxyConfig.logLevel === 'number') LOG.setLevel(proxyConfig.logLevel);
+            if (typeof proxyConfig.logLevel === 'object') Object.entries(proxyConfig.logLevel).forEach(([level, b]) => LOG.toggleLevel(level, b));
+        } catch (err) {
+            LOG.PROXY_ERROR && console.error(timestamp(), `Failed to configure log level`, err);
         }
     });
 
