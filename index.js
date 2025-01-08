@@ -127,11 +127,11 @@ function startProxy() {
     });
 
     // Global black/white list
-    if (proxyConfig.blacklist) watch(proxyConfig.blacklist, file => {
+    if (proxyConfig.blacklist) fw.watch(proxyConfig.blacklist, file => {
         globalBlacklist = parseTxtFile(file);
         LOG.INFO && console.log(timestamp(), "Loaded global blacklist", `(${globalBlacklist.length} entries)`);
     });
-    if (proxyConfig.whitelist) watch(proxyConfig.whitelist, file => {
+    if (proxyConfig.whitelist) fw.watch(proxyConfig.whitelist, file => {
         globalWhitelist = parseTxtFile(file);
         LOG.INFO && console.log(timestamp(), "Loaded global whitelist", `(${globalWhitelist.length} entries)`);
     });
