@@ -134,38 +134,38 @@ function startProxy() {
 
     // Proxy Configuration
     fw.watch("config.json", (json, filename) => {
-        LOG.PROXY_INFO && console.log(timestamp(), `Loaded Proxy Config (${filename})`);
         proxyConfig = json;
+        LOG.PROXY_INFO && console.log(timestamp(), `[PROXY_CONFIG] Loaded Proxy Config (${filename})`);
 
         // set log level
         try {
             if (typeof proxyConfig.logLevel === 'number') LOG.setLevel(proxyConfig.logLevel);
             if (typeof proxyConfig.logLevel === 'object') Object.entries(proxyConfig.logLevel).forEach(([level, b]) => LOG.toggleLevel(level, b));
         } catch (err) {
-            LOG.PROXY_ERROR && console.error(timestamp(), `Failed to configure log level`, err);
+            LOG.PROXY_ERROR && console.error(timestamp(), `[PROXY_CONFIG_ERROR] Failed to configure log level.`, String(err));
         }
     });
 
     // Auth page html
     fw.watch(path.join(__dirname, "authorization.html"), file => {
         defaultAuthorizationHtmlFile = file;
-        LOG.PROXY_DEBUG && console.log(timestamp(), "Loaded authorization HTML");
+        LOG.PROXY_DEBUG && console.log(timestamp(), "[PROXY_CONFIG] Loaded authorization HTML");
     });
 
     // Global black/white list
     if (proxyConfig.blacklist) fw.watch(proxyConfig.blacklist, file => {
         globalBlacklist = parseTxtFile(file);
-        LOG.PROXY_INFO && console.log(timestamp(), "Loaded global blacklist", `(${globalBlacklist.length} entries)`);
+        LOG.PROXY_INFO && console.log(timestamp(), "[PROXY_CONFIG] Loaded global blacklist", `(${globalBlacklist.length} entries)`);
     });
     if (proxyConfig.whitelist) fw.watch(proxyConfig.whitelist, file => {
         globalWhitelist = parseTxtFile(file);
-        LOG.PROXY_INFO && console.log(timestamp(), "Loaded global whitelist", `(${globalWhitelist.length} entries)`);
+        LOG.PROXY_INFO && console.log(timestamp(), "[PROXY_CONFIG] Loaded global whitelist", `(${globalWhitelist.length} entries)`);
     });
 
     // Defaults for services
     fw.watch("./services/_defaults.json", (json, filename) => {
-        LOG.SERVICE_INFO && console.log(timestamp(), `Loaded serviceDefaults config (${filename})`);
         serviceDefaults = json;
+        LOG.SERVICE_INFO && console.log(timestamp(), `[PROXY_CONFIG] Loaded serviceDefaults config (${filename})`);
     });
 
     // Dynamically load services into a map that is live reloaded
@@ -173,7 +173,7 @@ function startProxy() {
     // the map will be modified automatically if files are added removed or the content changes
     // the file name is used as a key to that json (parsed) without extension
     services = createLiveFileMap('./services/*.json', (service, key, filename) => {
-        LOG.SERVICE_INFO && console.log(timestamp(), "Loaded service:", key, service);
+        LOG.SERVICE_INFO && console.log(timestamp(), "[SERVICE_INFO] Loaded service:", key, '\n', service);
         return service;
     });
     services.watch();
@@ -187,7 +187,7 @@ function startProxy() {
     proxyServer.on("connection", connectionHandler);
     proxyServer.listen(proxyConfig.port, proxyConfig.hostname, () => {
         LOG.PROXY_INFO && displaySummary();
-        LOG.PROXY_INFO && console.log(timestamp(), 'Proxy started...');
+        LOG.PROXY_INFO && console.log(timestamp(), '[PROXY_INFO] Proxy started...');
     });
     
     process.on("SIGINT", shutdownProxy);

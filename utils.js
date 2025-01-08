@@ -396,7 +396,7 @@ function LogFlag(levels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']) {
          */
         toggleLevel(levelName, bool) {
             if (this.levels[levelName] === undefined) throw new Error(`Argument is not a valid levelName! (${levelName})`);
-            if (bool !== undefined) throw new Error(`Argument bool must be a boolean! (${bool})`);
+            if ([true, false, 0, 1].includes(bool)) throw new Error(`Argument bool must be a boolean or 0 or 1! (${bool})`);
             this.enableLevels(bool ? (this.currentLevel | this.levels[levelName]) : (this.currentLevel & ~this.levels[levelName]));
         },
         /**
