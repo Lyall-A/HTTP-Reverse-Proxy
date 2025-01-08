@@ -4,34 +4,26 @@
     "tls": false,
     "key": null,
     "cert": null,
-
     "whitelist": "ip-whitelist.conf",
     "blacklist": null,
-
+    "additionalProxyServerOptions": {},
     "logLevel": {
         "PROXY_DEBUG": 0,
         "PROXY_INFO": 1,
         "PROXY_WARN": 1,
         "PROXY_ERROR": 1,
-
         "AUTH_DEBUG": 0,
         "AUTH_GRANTED": 1,
         "AUTH_DENIED": 1,
         "AUTH_ERROR": 1,
-
         "SERVICE_DEBUG": 0,
         "SERVICE_INFO": 1,
         "SERVICE_WARN": 1,
         "SERVICE_ERROR": 1,
-        
         "CONNECTION_DEBUG": 0,
         "CONNECTION_INFO": 1,
         "CONNECTION_ACCEPTED": 1,
         "CONNECTION_REFUSED": 1,
         "CONNECTION_ERROR": 1
-    },
-
-    "additionalProxyServerOptions": {
-        
     }
 }

@@ -269,7 +269,7 @@ function connectionHandler(proxyConnection) {
             // Get hostname
             const [hostname] = getHeader(headers, "Host")?.match(hostnameRegex) || [];
             if (!hostname) {
-                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted. `[CONNECTION_NO_HOST] tried to establish a connection without host header`);
+                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, `[CONNECTION_REFUSED_NO_HOST] tried to connect without 'host' header`);
                 return proxyConnection.destroy();
             }
 
