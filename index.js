@@ -233,18 +233,18 @@ function connectionHandler(proxyConnection) {
     const ip = proxyConnection.remoteAddress?.split("::ffff:")[1] || proxyConnection.remoteAddress;
 
     if (!ip) {
-        LOG.CONNECTION_ERROR && console.log(timestamp(), `[REFUSED] No IP?!`);
+        LOG.CONNECTION_ERROR && console.err(timestamp(), `[CONNECTION_ERROR] No IP?!`, proxyConnection);
         return proxyConnection.destroy(); // Why does this happen sometimes?
     }
 
     // Global Blacklist
     if (globalBlacklist && ipMatch(ip, globalBlacklist)) {
-        LOG.CONNECTION_REFUSED && console.log(timestamp(), `[CONNECTION_BLOCKED_BLACKLISTED] Blacklisted ${ip} attempted to connect!`);
+        LOG.CONNECTION_REFUSED && console.log(timestamp(), ip, `[CONNECTION_BLOCKED_BLACKLISTED] Blacklisted attempted to connect!`);
         return proxyConnection.destroy();
     }
     // Global Whitelist
     if (globalWhitelist && !ipMatch(ip, globalWhitelist)) {
-        LOG.CONNECTION_REFUSED && console.log(timestamp(), `[CONNECTION_BLOCKED_UNWHITELISTED] Unwhitelisted ${ip} attempted to connect!`);
+        LOG.CONNECTION_REFUSED && console.log(timestamp(), ip, `[CONNECTION_BLOCKED_UNWHITELISTED] Unwhitelisted attempted to connect!`);
         return proxyConnection.destroy();
     }
 
@@ -257,7 +257,6 @@ function connectionHandler(proxyConnection) {
         const splitHeaders = rawHeaders.split("\r\n");
 
         const [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
-
         
         if (requestLine) {
             // Get headers
@@ -276,7 +275,7 @@ function connectionHandler(proxyConnection) {
             // Find service to handle this request
             const service = findService(services, hostname);
             if (!service) {
-                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, `[PROXY_SERVICE_NOT_FOUND] tried to reach unknown hostname ${hostname}`);
+                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '>', hostname, `[PROXY_SERVICE_NOT_FOUND] tried to reach unknown hostname ${hostname}`);
                 return proxyConnection.destroy();
             }
 
@@ -285,11 +284,11 @@ function connectionHandler(proxyConnection) {
 
             // Get real IP (if using some sort of proxy like Cloudflare)
             realIp = serviceOptions.realIpHeader ? headers[serviceOptions.realIpHeader] : null;
-            ipFormatted = `${ip}${realIp ? ` (${realIp})` : ""}`;
+            ipFormatted = realIp ? `${realIp}*` : ip;
 
             // Make sure using supported version
             if (serviceOptions.supportedVersions && !serviceOptions.supportedVersions.includes(version)) {
-                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, `[CONNECTION_UNSUPPORTED_VERSION] using unsupported version ${version}`);
+                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '>', hostname, `[CONNECTION_UNSUPPORTED_VERSION] using unsupported version ${version}`);
                 return proxyConnection.destroy();
             }
 
@@ -297,20 +296,20 @@ function connectionHandler(proxyConnection) {
             // Whitelist
             const whitelist = serviceOptions.whitelist !== serviceDefaults.whitelist ? readJson(serviceOptions.whitelist) : null;
             if (whitelist && !ipMatch(ip, whitelist)) {
-                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, `[CONNECTION_REFUSED_UNWHITELISTED] Unwhitelisted ${ip} attempted to connect!`);
+                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '>', hostname, `[CONNECTION_REFUSED_UNWHITELISTED] Unwhitelisted attempted to connect!`);
                 return proxyConnection.destroy();
             }
             // Blacklist
             const blacklist = serviceOptions.blacklist !== serviceDefaults.blacklist ? readJson(serviceOptions.blacklist) : null;
             if (blacklist && ipMatch(ip, blacklist)) {
-                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, `[CONNECTION_REFUSED_BLACKLISTED] Blacklisted ${ip} attempted to connect!`);
+                LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '>', hostname, `[CONNECTION_REFUSED_BLACKLISTED] Blacklisted attempted to connect!`);
                 return proxyConnection.destroy();
             }
 
             // Service requires authorization
             if (serviceOptions.authorization) {
                 if (!serviceOptions.authorizationPassword) {
-                    LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, `[AUTH_REFUSED_MISSING_CONFIG] tried to reach ${hostname}. Error Service misconfigured! Authorization is enabled but password is empty!`);
+                    LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, '>', hostname, `[AUTH_REFUSED_MISSING_CONFIG] Error Service misconfigured! Authorization is enabled but password is empty!`);
                     return proxyConnection.destroy();
                 }
 
@@ -318,7 +317,7 @@ function connectionHandler(proxyConnection) {
                 if (serviceOptions.authorizationRemembersIp && realIp) {
                     const lastAuthorized = rememberedIps.get(realIp + hostname);
                     if (lastAuthorized && (Date.now() - lastAuthorized < serviceOptions.authorizationRemembersIpTtl)) {
-                        LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, `[AUTH_REMEMBERED] bypassing auth to ${hostname}`);
+                        LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_REMEMBERED] bypassing auth`);
                         bypassAuth = true;
                     }
                     // ip not on rememberlist, just continue with check as normal
@@ -333,10 +332,10 @@ function connectionHandler(proxyConnection) {
                         const isLast = i === authorizationTypes.length - 1;
                         authorized = checkAuthorization(authorizationTypes[i].toLowerCase(), isLast);
                         if (authorized) {
-                            LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, `[AUTH_GRANTED] to ${hostname}`);
+                            LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_GRANTED] Authenticated`);
                             // successfuly authorized add to remembered ips
                             if (serviceOptions.authorizationRemembersIp && realIp) {
-                                LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, `[AUTH_REMEMBER] Added to remember list - ${hostname}`);
+                                LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_REMEMBER] Added to remember list - ${hostname}`);
                                 rememberedIps.set(realIp + hostname, Date.now());
                             }
                             break;
@@ -345,7 +344,7 @@ function connectionHandler(proxyConnection) {
                     
                     // Authorization DENIED!
                     if (!authorized) {
-                        LOG.AUTH_DENIED && console.log(timestamp(), ipFormatted, `[AUTH_DENIED] tried to reach ${hostname}`);
+                        LOG.AUTH_DENIED && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_DENIED] Connection refused`);
                         return;
                     }
                 }
@@ -362,7 +361,7 @@ function connectionHandler(proxyConnection) {
                         return true;
                     }
                     if (shouldSendFailResp) {
-                        LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, `[AUTH_DENIED_COOKIE] tried to reach ${hostname} `);
+                        LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_DENIED_COOKIE] Unauthoried. Serving login page`);
                         const vars = {
                             config: proxyConfig,
                             serverOptions: serviceOptions,
@@ -381,7 +380,7 @@ function connectionHandler(proxyConnection) {
                     const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
                     if (password === serviceOptions.authorizationPassword) return true;
                     if (shouldSendFailResp) {
-                        LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, `[AUTH_DENIED_WWW_AUTHENTICATE] tried to reach ${hostname} `);
+                        LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_DENIED_WWW_AUTHENTICATE] Unauthorized`);
                         proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
                     }
                     return false;
@@ -390,20 +389,20 @@ function connectionHandler(proxyConnection) {
                     const header = getHeader(headers, serviceOptions.customAuthorizationHeader);
                     if (header === serviceOptions.authorizationPassword) return true;
                     if (shouldSendFailResp) {
-                        LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, `[AUTH_DENIED_HEADER] tried to reach ${hostname} `);
+                        LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '>', hostname, `[AUTH_DENIED_HEADER] Unauthorized. Missing header`);
                         proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
                     }
                     return false;
                 }
                 
-                LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, `[AUTH_REFUSED_INVALID_CONFIG] tried to reach ${hostname}. Error Service misconfigured! "${authorizationType}" is not a valid authorizationType!`);
+                LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, '>', hostname, `[AUTH_REFUSED_INVALID_CONFIG] Error Service misconfigured! "${authorizationType}" is not a valid authorizationType!`);
                 proxyConnection.destroy();
                 return false;
             }
 
             // Is redirect
             if (serviceOptions.redirect) {
-                LOG.CONNECTION_INFO && console.log(timestamp(), ipFormatted, `[REQUEST_REDIRECTED] redirected ${hostname} -> ${serviceOptions.redirect}`);
+                LOG.CONNECTION_INFO && console.log(timestamp(), ipFormatted, '>', hostname, `[REQUEST_REDIRECTED] redirected to ${serviceOptions.redirect}`);
                 return proxyConnection.end(`${version} 301 Moved Permanently\r\nLocation: ${serviceOptions.redirect}\r\n\r\n`);
             }
 
@@ -442,11 +441,11 @@ function connectionHandler(proxyConnection) {
                 Buffer.from(rawData) // Data
             ]);
 
-            // console.log(timestamp(), ipFormatted, reconstructedData.toString());
+            // console.log(timestamp(), ipFormatted, '>', hostname, reconstructedData.toString());
 
             if (!connectionToService) {
                 // Connect to server
-                LOG.CONNECTION_ACCEPTED && console.log(timestamp(), ipFormatted, `[SERVICE_CONNECTION_STARTED] connecting to ${hostname}`);
+                LOG.CONNECTION_ACCEPTED && console.log(timestamp(), ipFormatted, '>', hostname, `[SERVICE_CONNECTION_STARTED] connecting to service...`);
 
                 connectionToService = (serviceOptions.useTls ? tls : net).connect({
                     host: serviceOptions.serverHostname,
