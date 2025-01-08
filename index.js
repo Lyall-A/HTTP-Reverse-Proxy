@@ -147,7 +147,7 @@ function startProxy() {
     // the map will be modified automatically if files are added removed or the content changes
     // the file name is used as a key to that json (parsed) without extension
     services = createLiveFileMap('./services/*.json', (service, key, filename) => {
-        LOG.INFO && console.log(timestamp(), "Loaded service:", key);
+        LOG.INFO && console.log(timestamp(), "Loaded service:", key, service);
         return service;
     });
     services.watch();
@@ -293,13 +293,14 @@ function connectionHandler(proxyConnection) {
                 if (serviceOptions.authorizationRemembersIp && realIp) {
                     const lastAuthorized = rememberedIps.get(realIp + hostname);
                     if (lastAuthorized && (Date.now() - lastAuthorized < serviceOptions.authorizationRemembersIpTtl)) {
+                        LOG.DEBUG && console.log(timestamp(), `[AUTH_REMEMBERED] ${ipFormatted} - ${hostname} on the recent auth, bypassing auth`);
                         bypassAuth = true;
                     }
                     // i dont remember this ip being authorized, just continue with check as normal
                 }
                 
                 // Check authorization
-                if (!bypassAuth) {
+                if (bypassAuth === false) {
 
                     let authorized = false;
                     const authorizationTypes = Array.isArray(serviceOptions.authorizationType) ? serviceOptions.authorizationType : [serviceOptions.authorizationType];
@@ -307,8 +308,12 @@ function connectionHandler(proxyConnection) {
                         const isLast = i === authorizationTypes.length - 1;
                         authorized = checkAuthorization(authorizationTypes[i].toLowerCase(), isLast);
                         if (authorized) {
+                            LOG.DEBUG && console.log(timestamp(), `[AUTH_GRANTED] ${ipFormatted} to ${hostname}`);
                             // successfuly authorized add to remembered ips
-                            if (serviceOptions.authorizationRemembersIp && realIp) rememberedIps.set(realIp + hostname, Date.now());
+                            if (serviceOptions.authorizationRemembersIp && realIp) {
+                                LOG.DEBUG && console.log(timestamp(), `[AUTH_REMEMBER] Added to remember list ${ipFormatted} - ${hostname}`);
+                                rememberedIps.set(realIp + hostname, Date.now());
+                            }
                             break;
                         }
                     }
@@ -332,7 +337,7 @@ function connectionHandler(proxyConnection) {
                         return true;
                     }
                     if (shouldSendFailResp) {
-                        // LOG.DEBUG && console.log(timestamp(), `[AUTH_DENIED_COOKIE] ${ipFormatted} tried to reach ${hostname} `);
+                        LOG.DEBUG && console.log(timestamp(), `[AUTH_DENIED_COOKIE] ${ipFormatted} tried to reach ${hostname} `);
                         const vars = {
                             config: proxyConfig,
                             serverOptions: serviceOptions,
@@ -351,7 +356,7 @@ function connectionHandler(proxyConnection) {
                     const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
                     if (password === serviceOptions.authorizationPassword) return true;
                     if (shouldSendFailResp) {
-                        // LOG.DEBUG && console.log(timestamp(), `[AUTH_DENIED_WWW_AUTHENTICATE] ${ipFormatted} tried to reach ${hostname} `);
+                        LOG.DEBUG && console.log(timestamp(), `[AUTH_DENIED_WWW_AUTHENTICATE] ${ipFormatted} tried to reach ${hostname} `);
                         proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
                     }
                     return false;
@@ -360,7 +365,7 @@ function connectionHandler(proxyConnection) {
                     const header = getHeader(headers, serviceOptions.customAuthorizationHeader);
                     if (header === serviceOptions.authorizationPassword) return true;
                     if (shouldSendFailResp) {
-                        // LOG.DEBUG && console.log(timestamp(), `[AUTH_DENIED_HEADER] ${ipFormatted} tried to reach ${hostname} `);
+                        LOG.DEBUG && console.log(timestamp(), `[AUTH_DENIED_HEADER] ${ipFormatted} tried to reach ${hostname} `);
                         proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
                     }
                     return false;
