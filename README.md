@@ -10,14 +10,15 @@ Pre-configured to work behind Cloudflare proxy and disallow robots
 * Authorization using Cookies, WWW-Authenticate header or a custom header
 * IP range whitelist and blacklist
 * URI bypass
-* Each server can have different configurations
+* Each service can have different configurations
+* Live reload of services and configurations
 
 
 # How to use
 
 1. Install the CLI
     ```sh
-    npm i reverseproxy -g
+    npm i -g git@github.com:victornpb/HTTP-Reverse-Proxy.git
     ```
 2. Create a folder for containing your proxy files
     ```sh

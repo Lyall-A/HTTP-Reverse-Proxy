@@ -101,11 +101,17 @@ function scaffoldServer() {
         process.exit(1);
     }
 
+    const excludedFiles = {
+        darwin: ["start.bat","start.sh"],
+        linux: ["start.bat", "start.command"], 
+        win32: ["start.command", "start.sh"]
+    }[os.platform()] || [];
+
     let conflict = false;
     fs.readdirSync(EXAMPLE_DIR).forEach(file => {
         const src = path.join(EXAMPLE_DIR, file);
         const dest = path.join(process.cwd(), file);
-        if (['.DS_Store', 'Thumbs.db', 'desktop.ini'].includes(file)) return;
+        if (['.DS_Store', 'Thumbs.db', 'desktop.ini', ...excludedFiles].includes(file)) return;
         if (fs.existsSync(dest) && !fs.statSync(dest).isDirectory()) {
             console.warn(`File already exists and would be overwritten: ${file}`);
             conflict = true;
