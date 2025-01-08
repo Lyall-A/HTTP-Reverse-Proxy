@@ -25,7 +25,7 @@ Files prefixed with `_` are ignored. (except `_defaults.json` read below).
 You can use this to draft services or to disable them.
 
 ## Properties
-```js
+```jsonc
 {
     "whitelist": "whitelist.json",                                     // Path to custom whitelist for server
     "blacklist": null,                                                 // Path to custom blacklist for server
