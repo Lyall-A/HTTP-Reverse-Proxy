@@ -150,7 +150,6 @@ class FileWatcher {
     constructor() {
         this.watchers = new Map();
     }
-
     /**
      * Watches for file changes
      * @param {string} filepath File path to watch
@@ -175,11 +174,7 @@ class FileWatcher {
         this.watchers.get(filepath).push(handler);
         handler(); // call onChange on init
     }
-
-    /**
-     * Stops watching a specific file
-     * @param {string} filepath File path to unwatch
-     */
+    /** Stops watching a specific file */
     unwatch(filepath) {
         if (this.watchers.has(filepath)) {
             const listeners = this.watchers.get(filepath);
@@ -187,10 +182,7 @@ class FileWatcher {
             this.watchers.delete(filepath);
         }
     }
-
-    /**
-     * Stops watching all files
-     */
+    /** Stops watching all files */
     unwatchAll() {
         for (const [filepath, listeners] of this.watchers.entries()) {
             listeners.forEach(listener => fs.unwatchFile(filepath, listener));
@@ -228,9 +220,7 @@ function createLiveFileMap(globPattern, onRead) {
     function watch() {
         map.watcher = fs.watch(watchDirectory, (eventType, filename) => {
             if (!filename) return;
-
             const fullPath = path.join(watchDirectory, filename);
-
             if (eventType === 'rename') {
                 if (fs.existsSync(fullPath)) {
                     if (filename.endsWith(`.${fileExtension}`) && !filename.startsWith('_')) {
@@ -274,7 +264,6 @@ function createLiveFileMap(globPattern, onRead) {
     }
 
     init();
-  
     return map;
 }
 
@@ -356,7 +345,7 @@ function defaults(defaults, options) {
  * LOG.INFO && console.log('Hello world');
  * LOG.WARN && console.warn('Warning message');
  */
-function LogFlag(levels = ['ERROR', 'WARN', 'DEBUG', 'INFO', 'VERBOSE']) {
+function LogFlag(levels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']) {
     const LOG = Object.create({
         /**
          * Defines the log available to use.
@@ -385,6 +374,7 @@ function LogFlag(levels = ['ERROR', 'WARN', 'DEBUG', 'INFO', 'VERBOSE']) {
          * @example LOG.enableLevels(LOG.levels.INFO)
          */
         setLevel(level) {
+            if (typeof level !== 'number') throw new Error('Invalid argument! It should be reference (e.g.: LOG.ERROR) or a number.');
             return this.enableLevels(level - 1 | level);
         },
         /**
@@ -393,10 +383,21 @@ function LogFlag(levels = ['ERROR', 'WARN', 'DEBUG', 'INFO', 'VERBOSE']) {
          * @example LOG.enableLevels(LOG.levels.ERROR | LOG.levels.WARN | LOG.levels.VERBOSE)
          */
         enableLevels(levelsBitmask) {
+            if (typeof levelsBitmask !== 'number') throw new Error(`Argument is not a bitmask! It should be a number or a bitwise expression.`);
             Object.keys(this).forEach(LEVEL => {
                 this[LEVEL] = Boolean(levelsBitmask & this.levels[LEVEL]);
             });
             return this.currentLevel = levelsBitmask;
+        },
+        /**
+         * Enables or disable a specific log levels by its name.
+         * @param {string} levelName 
+         * @param {boolean} bool 
+         */
+        toggleLevel(levelName, bool) {
+            if (this.levels[levelName] === undefined) throw new Error('Argument is not a valid levelName!');
+            if (bool !== undefined) throw new Error('Argument bool must be a boolean');
+            this.enableLevels(bool ? (this.currentLevel | this.levels[levelName]) : (this.currentLevel & ~this.levels[levelName]));
         },
         /**
          * Logs a message if the specified log level is enabled.

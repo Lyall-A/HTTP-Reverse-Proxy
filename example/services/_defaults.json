@@ -8,6 +8,8 @@
     "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",
     "customAuthorizationHeader": "X-HTTP-Reverse-Proxy-Authorization",
     "authorizationType": "cookies",
+    "authorizationRemembersIp": false,
+    "authorizationRemembersIpTtl": 86400,
     "cookieMaxAge": 86400,
     "modifiedHeaders": {
         "Host": "%{serverOptions.serverHostname}:%{serverOptions.serverPort}",
