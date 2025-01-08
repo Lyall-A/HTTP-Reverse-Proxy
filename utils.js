@@ -389,15 +389,11 @@ function LogFlag(levels = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'VERBOSE']) {
             });
             return this.currentLevel = levelsBitmask;
         },
-        /**
-         * Enables or disable a specific log levels by its name.
-         * @param {string} levelName 
-         * @param {boolean} bool 
-         */
-        toggleLevel(levelName, bool) {
-            if (this.levels[levelName] === undefined) throw new Error(`Argument is not a valid levelName! (${levelName})`);
-            if ([true, false, 0, 1].includes(bool)) throw new Error(`Argument bool must be a boolean or 0 or 1! (${bool})`);
-            this.enableLevels(bool ? (this.currentLevel | this.levels[levelName]) : (this.currentLevel & ~this.levels[levelName]));
+        /** Enables or disable a specific log levels by its name. */
+        toggleLevel(levelName, enable) {
+            if (this.levels[levelName] === undefined) throw new Error(`Invalid levelName! (${levelName})`);
+            if (![true, false, 0, 1].includes(enable)) throw new Error(`Invalid value! ${levelName}: ${enable} is not true/false or 0/1!`);
+            this.enableLevels(enable ? (this.currentLevel | this.levels[levelName]) : (this.currentLevel & ~this.levels[levelName]));
         },
         /**
          * Logs a message if the specified log level is enabled.
