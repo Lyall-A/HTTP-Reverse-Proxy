@@ -203,34 +203,34 @@ function startProxy() {
 
 function displaySummary() {
   console.log(dedent(`
-        ================================================================================
-          REVERSE PROXY SERVER SUMMARY
-        ================================================================================
+    ================================================================================
+      REVERSE PROXY SERVER SUMMARY
+    ================================================================================
 
-        Proxy Listening on:
-          Hostname: ${proxyConfig.hostname || "0.0.0.0"}
-          Port: ${proxyConfig.port || 80}
-          
-          TLS: ${proxyConfig.tls ? "Enabled" : "Not enabled"}
-            - Key: ${proxyConfig.key || "Not Provided"}
-            - Certificate: ${proxyConfig.cert || "Not Provided"}
-        
-        Logging Level: ${LOG.currentLevel}
+    Proxy Listening on:
+      Hostname: ${proxyConfig.hostname || "0.0.0.0"}
+      Port: ${proxyConfig.port || 80}
+      
+      TLS: ${proxyConfig.tls ? "Enabled" : "Not enabled"}
+        - Key: ${proxyConfig.key || "Not Provided"}
+        - Certificate: ${proxyConfig.cert || "Not Provided"}
+    
+    Logging Level: ${LOG.currentLevel}
 
-        Global Whitelist: ${globalWhitelist?.length ?? 'Not Configured'} entries
-        Global Blacklist: ${globalBlacklist?.length ?? 'Not Configured'} entries
+    Global Whitelist: ${globalWhitelist?.length ?? 'Not Configured'} entries
+    Global Blacklist: ${globalBlacklist?.length ?? 'Not Configured'} entries
 
-        Registered Services: (${services.size} services)
-        --------------------------------------------------------------------------------
-    `));
+    Registered Services: (${services.size} services)
+    --------------------------------------------------------------------------------
+  `));
   services.forEach((service, key) => {
     console.log(dedent(`
-            ${key}:
-              Hostnames: ${service.proxyHostnames.join(", ")}
-              Target:    ${service.serverHostname}:${service.serverPort}
-              TLS:       ${service.useTls ? "Yes" : "No"}
-              Auth:      ${service.authorization ? service.authorizationType : "None"}
-        `));
+      ${key}:
+        Hostnames: ${service.proxyHostnames.join(", ")}
+        Target:    ${service.serverHostname}:${service.serverPort}
+        TLS:       ${service.useTls ? "Enabled" : "Not enabled"}
+        Auth:      ${service.authorization ? service.authorizationType : "None"}
+    `));
   });
   console.log('='.repeat(80));
 }
