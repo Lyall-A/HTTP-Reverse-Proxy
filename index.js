@@ -239,7 +239,7 @@ function connectionHandler(proxyConnection) {
     const ip = proxyConnection.remoteAddress?.split("::ffff:")[1] || proxyConnection.remoteAddress;
 
     if (!ip) {
-        LOG.CONNECTION_ERROR && console.err(timestamp(), `[CONNECTION_ERROR] No IP?!`, proxyConnection);
+        LOG.CONNECTION_ERROR && console.error(timestamp(), `[CONNECTION_ERROR] No IP?!`, proxyConnection);
         return proxyConnection.destroy(); // Why does this happen sometimes?
     }
 
