@@ -489,7 +489,7 @@ function connectionHandler(proxyConnection) {
   proxyConnection.on("close", closeServerConnection);
   proxyConnection.on("end", closeServerConnection);
   proxyConnection.on("error", err => {
-    LOG.PROXY_ERROR && console.error(timestamp(), ipFormatted, "[PROXY_SERVER_ERROR]", err);
+    LOG.PROXY_ERROR && console.error(timestamp(), `🖥 ${ip}`, "[PROXY_SERVER_ERROR]", err);
     closeServerConnection();
   });
   proxyConnection.on("drain", () => connectionToService?.resume());
