@@ -386,7 +386,9 @@ function connectionHandler(proxyConnection) {
               `Cache-Control: no-cache, no-store, must-revalidate\r\n` +
               `Pragma: no-cache\r\n` +
               `Expires: 0\r\n` +
-              `Service-Worker-Navigation-Preload: true\r\n\r\n` +
+              `Service-Worker-Navigation-Preload: true\r\n` +
+              `Clear-Site-Data: "cache", "cookies", "storage", "executionContexts"\r\n` +
+              `\r\n`+
               `${authorizationHtml}`);
   }
           return false;
