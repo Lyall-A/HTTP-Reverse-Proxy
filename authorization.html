@@ -10,6 +10,17 @@
     <meta property="og:description" content="This page requires authentication">
     <meta property="og:type" content="website">
     <meta name="robots" content="noindex">
+    <script>
+        if (navigator.serviceWorker) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                for (const registration of registrations) {
+                    registration.unregister().then((success) => {
+                        if (success) console.log('Service worker unregistered.');
+                    });
+                }
+            });
+        }
+    </script>
 
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700" rel="stylesheet">
     <style>
@@ -220,7 +231,6 @@
 
 <body class="align">
     <div class="grid">
-
         <h1>Authorization</h1>
         <h3><a id="host-name">%{hostname}</a> is password protected</h3>
 
@@ -256,7 +266,7 @@
         <footer class="text--center">
             <p>
                 Powered by
-                <a href="https://github.com/Lyall-A/HTTP-Reverse-Proxy" target="_blank">HTTP-Reverse-Proxy</a>
+                <a href="https://github.com/victornpb/HTTP-Reverse-Proxy" target="_blank">HTTP-Reverse-Proxy</a>
                 <svg class="icon"><use xlink:href="#icon-arrow-right"></use></svg>
             </p>
         </footer>
