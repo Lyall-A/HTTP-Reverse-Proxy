@@ -379,8 +379,16 @@ function connectionHandler(proxyConnection) {
               ip: realIp || ip,
             };
             const authorizationHtml = formatString(defaultAuthorizationHtmlFile, vars);
-            proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Type: text/html\r\nContent-Length: ${authorizationHtml.length}\r\n\r\n${authorizationHtml}`);
-          }
+            proxyConnection.write(
+              `${version} 401 Unauthorized\r\n` +
+              `Content-Type: text/html\r\n` +
+              `Content-Length: ${authorizationHtml.length}\r\n` +
+              `Cache-Control: no-cache, no-store, must-revalidate\r\n` +
+              `Pragma: no-cache\r\n` +
+              `Expires: 0\r\n` +
+              `Service-Worker-Navigation-Preload: true\r\n\r\n` +
+              `${authorizationHtml}`);
+  }
           return false;
         }
         else if (authorizationType === "www-authenticate") {
