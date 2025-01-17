@@ -1,9 +1,11 @@
 #!/bin/bash
 cd "$( dirname "$0" )"
-while true
-do
+
+# Keep the process running if it crashes
+while true; do
+  echo "Updating proxy..."
+  npm i -g git@github.com:victornpb/HTTP-Reverse-Proxy.git
   reverseproxy start
-  
-  echo "Restarting in 5 seconds..."
+  echo "Reverse Proxy crashed. Restarting in 5 seconds..."
   sleep 5
 done
