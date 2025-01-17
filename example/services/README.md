@@ -14,10 +14,10 @@ chat.json
     "proxyHostnames": ["chat.example.com", "chat.example.net"],
     "serverHostname": "10.0.0.11",
     "serverPort": 3000,
-    "authorization": true,
-    "authorizationType": "cookies",
-    "authorizationPassword": "password",
-    "useTls": true
+    "useTls": true,
+    "auth": true,
+    "authType": "cookies",
+    "authPassword": "password"
 }
 ```
 
@@ -27,28 +27,27 @@ You can use this to draft services or to disable them.
 ## Properties
 ```jsonc
 {
-    "whitelist": "whitelist.json",                                     // Path to custom whitelist for server
-    "blacklist": null,                                                 // Path to custom blacklist for server
-    "realIpHeader": "CF-Connecting-Ip",                                // Header that contains real IP if behind another proxy
-    "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",         // Cookie used for cookie based authorization
-    "customAuthorizationHeader": "X-HTTP-Reverse-Proxy-Authorization", // Cookie used for custom header based authorization
-    "authorizationType": "cookies",                                    // Type of authorization to use (cookies, www-authenticate, custom-header)
-    "authorizationPassword": "password",                               // The password required to connect, do not set this to null, remove to use defaults
-    "authorizationRemembersIp": false,                                 // Skip re-authentication for IPs that have previously proven themselves
-    "authorizationRemembersIpTtl": 86400,                              // How long the IP will be remembered
-    "cookieMaxAge": 86400,                                             // How long the authorization cookie lasts
     "proxyHostnames": ["localhost", "127.0.0.1"],                      // The hostnames to look for (start/end with period to match with ends/start with instead of exact match)
     "serverHostname": "example.com",                                   // The hostname to connect to
     "serverPort": 443,                                                 // The port to connect to
     "useTls": true,                                                    // Connect using TLS (HTTPS)
+    "whitelist": "whitelist.json",                                     // Path to custom whitelist for server
+    "blacklist": null,                                                 // Path to custom blacklist for server
+    "realIpHeader": "CF-Connecting-Ip",                                // Header that contains real IP if behind another proxy
+    "auth": false,                                                     // If this server should require authorization before connecting
+    "authType": "cookies",                                             // Type of authorization to use (cookies, www-authenticate, custom-header)
+    "authPassword": "password",                                        // The password required to connect, do not set this to null, remove to use defaults
+    "customAuthHeader": "X-HTTP-Reverse-Proxy-Authorization",          // Cookie used for custom header based authorization
+    "authCookie": "HTTP-Reverse-Proxy-Authorization",                  // Cookie used for cookie based authorization
+    "cookieMaxAge": 86400,                                             // How long the authorization cookie lasts
+    "authRemembersIp": false,                                          // Skip re-authentication for IPs that have previously proven themselves
+    "authRemembersIpTtl": 86400,                                       // How long the IP will be remembered
     "forceUri": "/test",                                               // Force a specific URI/path
     "redirect": "https://google.com",                                  // Redirect
-    "authorization": false,                                            // If this server should require authorization before connecting
     "modifiedHeaders": {                                               // Remove or change HTTP headers, you will probably need to change the Host header to the server hostname and remove any proxy related headers
         "Host": "example.com",
         "X-Forwarded-For": null
     },
-    "additionalServerOptions": { },                                    // Additional options for when connecting to server, useful for stuff like SNI
     "uriBypass": {                                                     // Bypass URI's and send custom data without connecting to server
         "/robots.txt": {
             "statusCode": 200,                                         // Defaults to 200
@@ -56,7 +55,8 @@ You can use this to draft services or to disable them.
             "headers": { "Content-Type": "text/plain" },               // NOTE: Content-Length is set by default
             "data": "User-agent: *\nDisallow: /"
         }
-    }
+    },
+    "additionalServerOptions": { }                                    // Additional options for when connecting to server, useful for stuff like SNI
 }
 ```
 

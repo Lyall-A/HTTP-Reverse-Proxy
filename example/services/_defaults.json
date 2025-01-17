@@ -2,15 +2,20 @@
     "supportedVersions": [
         "HTTP/1.1"
     ],
+    "useTls": false,
     "whitelist": "",
     "blacklist": "",
     "realIpHeader": "CF-Connecting-IP",
-    "authorizationCookie": "HTTP-Reverse-Proxy-Authorization",
-    "customAuthorizationHeader": "X-HTTP-Reverse-Proxy-Authorization",
-    "authorizationType": "cookies",
-    "authorizationRemembersIp": false,
-    "authorizationRemembersIpTtl": 86400,
+    "auth": false,
+    "authType": "cookies",
+    "authPassword": "",
+    "customAuthHeader": "X-HTTP-Reverse-Proxy-Authorization",
+    "authCookie": "HTTP-Reverse-Proxy-Authorization",
     "cookieMaxAge": 86400,
+    "authRemembersIp": false,
+    "authRemembersIpTtl": 86400,
+    "forceUri": null,
+    "redirect": null,
     "modifiedHeaders": {
         "Host": "%{serverOptions.serverHostname}:%{serverOptions.serverPort}",
         "X-Forwarded-Proto": null,
@@ -26,5 +31,6 @@
             "headers": { "Content-Type": "text/plain" },
             "data": "User-agent: *\nDisallow: /"
         }
-    }
+    },
+    "additionalServerOptions": { }
 }

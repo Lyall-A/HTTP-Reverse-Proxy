@@ -154,8 +154,8 @@ function startProxy() {
   });
 
   // Auth page html
-  fw.watch(path.join(__dirname, "authorization.html"), file => {
-    defaultAuthorizationHtmlFile = file;
+  fw.watch(path.join(__dirname, "auth.html"), file => {
+    defaultAuthHtmlFile = file;
     LOG.PROXY_DEBUG && console.log(timestamp(), "[PROXY_CONFIG] Loaded authorization HTML");
   });
 
@@ -229,7 +229,7 @@ function displaySummary() {
         Hostnames: ${service.proxyHostnames.join(", ")}
         Target:    ${service.serverHostname}:${service.serverPort}
         TLS:       ${service.useTls ? "Enabled" : "Not enabled"}
-        Auth:      ${service.authorization ? service.authorizationType : "None"}
+        Auth:      ${service.auth ? service.authType : "None"}
     `));
   });
   console.log('='.repeat(80));
@@ -314,16 +314,16 @@ function connectionHandler(proxyConnection) {
       }
 
       // Service requires authorization
-      if (serviceOptions.authorization) {
-        if (!serviceOptions.authorizationPassword) {
-          LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, '→', hostname, `[AUTH_REFUSED_MISSING_CONFIG] Error Service misconfigured! Authorization is enabled but password is empty!`);
+      if (serviceOptions.auth) {
+        if (!serviceOptions.authPassword) {
+          LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, '→', hostname, `[AUTH_REFUSED_MISSING_CONFIG] Error Service misconfigured! Auth is enabled but password is empty!`);
           return proxyConnection.destroy();
         }
 
         let bypassAuth = false;
-        if (serviceOptions.authorizationRemembersIp && realIp) {
+        if (serviceOptions.authRemembersIp && realIp) {
           const lastAuthorized = rememberedIps.get(realIp + hostname);
-          if (lastAuthorized && (Date.now() - lastAuthorized < serviceOptions.authorizationRemembersIpTtl)) {
+          if (lastAuthorized && (Date.now() - lastAuthorized < serviceOptions.authRemembersIpTtl)) {
             LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_REMEMBERED] bypassing auth`);
             bypassAuth = true;
           }
@@ -334,14 +334,14 @@ function connectionHandler(proxyConnection) {
         if (bypassAuth === false) {
 
           let authorized = false;
-          const authorizationTypes = Array.isArray(serviceOptions.authorizationType) ? serviceOptions.authorizationType : [serviceOptions.authorizationType];
-          for (let i = 0; i < authorizationTypes.length; i++) {
-            const isLast = i === authorizationTypes.length - 1;
-            authorized = checkAuthorization(authorizationTypes[i].toLowerCase(), isLast);
+          const authTypes = Array.isArray(serviceOptions.authType) ? serviceOptions.authType : [serviceOptions.authType];
+          for (let i = 0; i < authTypes.length; i++) {
+            const isLast = i === authTypes.length - 1;
+            authorized = checkAuthorization(authTypes[i].toLowerCase(), isLast);
             if (authorized) {
               LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED] Authenticated`);
               // successfuly authorized add to remembered ips
-              if (serviceOptions.authorizationRemembersIp && realIp) {
+              if (serviceOptions.authRemembersIp && realIp) {
                 LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_REMEMBER] Added to rememberedIps`);
                 rememberedIps.set(realIp + hostname, Date.now());
               }
@@ -358,13 +358,13 @@ function connectionHandler(proxyConnection) {
 
       }
 
-      function checkAuthorization(authorizationType, shouldSendFailResp) {
-        if (authorizationType === "cookies") {
+      function checkAuthorization(authType, shouldSendFailResp) {
+        if (authType === "form" || authType === "cookies") {
           const cookies = parseCookies(getHeader(headers, "Cookie") || "");
-          if (cookies[serviceOptions.authorizationCookie] === serviceOptions.authorizationPassword) {
+          if (cookies[serviceOptions.authCookie] === serviceOptions.authPassword) {
             LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED_COOKIE] Authorized via cookie`);
             // Remove cookie before sending to server
-            delete cookies[serviceOptions.authorizationCookie];
+            delete cookies[serviceOptions.authCookie];
             setHeader(headers, "Cookie", stringifyCookies(cookies));
             return true;
           }
@@ -374,52 +374,61 @@ function connectionHandler(proxyConnection) {
               config: proxyConfig,
               serviceOptions: serviceOptions,
               cookieMaxAge: serviceOptions.cookieMaxAge,
-              authorizationCookie: serviceOptions.authorizationCookie,
+              authCookie: serviceOptions.authCookie,
               hostname,
               ip: realIp || ip,
             };
-            const authorizationHtml = formatString(defaultAuthorizationHtmlFile, vars);
+            const authHtml = formatString(defaultAuthHtmlFile, vars);
             proxyConnection.write(
               `${version} 401 Unauthorized\r\n` +
               `Content-Type: text/html\r\n` +
-              `Content-Length: ${authorizationHtml.length}\r\n` +
+              `Content-Length: ${authHtml.length}\r\n` +
               `Cache-Control: no-cache, no-store, must-revalidate\r\n` +
               `Pragma: no-cache\r\n` +
               `Expires: 0\r\n` +
               `Service-Worker-Navigation-Preload: true\r\n` +
-              `Clear-Site-Data: "cache", "cookies", "storage", "executionContexts"\r\n` +
+              `Clear-Site-Data: "cache", "executionContexts"\r\n` +
               `\r\n`+
-              `${authorizationHtml}`);
+              `${authHtml}`);
   }
           return false;
         }
-        else if (authorizationType === "www-authenticate") {
+        else if (authType === "basic") {
           // Authorize using WWW-Authenticate header
           const password = Buffer.from((getHeader(headers, "Authorization") || "").split(" ")[1] || "", "base64").toString().split(":")[1];
-          if (password === serviceOptions.authorizationPassword) {
-            LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED_WWW_AUTHENTICATE] Authorized via WWW-Authenticate header`);
+          if (password === serviceOptions.authPassword) {
+            LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED_WWW_AUTHENTICATE] Authorized via Authorization header`);
             return true;
           }
           if (shouldSendFailResp) {
             LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_DENIED_WWW_AUTHENTICATE] Unauthorized`);
-            proxyConnection.write(`${version} 401 Unauthorized\r\nWWW-Authenticate: Basic\r\nContent-Length: 0\r\n\r\n`);
+            proxyConnection.write(
+              `${version} 401 Unauthorized\r\n`+
+              `WWW-Authenticate: Basic\r\n`+
+              `Content-Length: 0\r\n`+
+              `Cache-Control: no-cache, no-store, must-revalidate\r\n` +
+              `Pragma: no-cache\r\n` +
+              `Expires: 0\r\n` +
+              `Service-Worker-Navigation-Preload: true\r\n` +
+              `Clear-Site-Data: "cache", "executionContexts"\r\n` +
+              `\r\n`);
           }
           return false;
         }
-        else if (authorizationType === "custom-header") {
-          const header = getHeader(headers, serviceOptions.customAuthorizationHeader);
-          if (header === serviceOptions.authorizationPassword) {
-            LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED_HEADER] Authorized via custom header ${serviceOptions.customAuthorizationHeader}`);
+        else if (authType === "custom-header") {
+          const header = getHeader(headers, serviceOptions.customAuthHeader);
+          if (header === serviceOptions.authPassword) {
+            LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED_HEADER] Authorized via custom header ${serviceOptions.customAuthHeader}`);
             return true;
           }
           if (shouldSendFailResp) {
-            LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_DENIED_HEADER] Unauthorized. Missing header`);
+            LOG.AUTH_DEBUG && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_DENIED_HEADER] Unauthorized. Missing header ${serviceOptions.customAuthHeader}`);
             proxyConnection.write(`${version} 401 Unauthorized\r\nContent-Length: 0\r\n\r\n`);
           }
           return false;
         }
 
-        LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, '→', hostname, `[AUTH_REFUSED_INVALID_CONFIG] Error Service misconfigured! "${authorizationType}" is not a valid authorizationType!`);
+        LOG.AUTH_ERROR && console.error(timestamp(), ipFormatted, '→', hostname, `[AUTH_REFUSED_INVALID_CONFIG] Error Service misconfigured! "${authType}" is not a valid authType!`);
         proxyConnection.destroy();
         return false;
       }
