@@ -234,25 +234,25 @@
         <h1>Authorization</h1>
         <h3><a id="host-name">%{hostname}</a> is password protected</h3>
 
-        <form class="form login">
+        <form class="form login" action="/proxy_authentication">
             <!-- USER FIELD -->
             <!--
             <div class="form__field">
-                <label for="login__username">
+                <label for="proxy_login__username">
                     <svg class="icon"><use xlink:href="#icon-user"></use></svg>
                     <span class="hidden">Username</span>
                 </label>
-                <input id="login__username" name="username" autocomplete="username" type="text" class="form__input" placeholder="Username">
+                <input id="proxy_login__username" name="proxy_username" autocomplete="proxy_username" type="text" class="form__input" placeholder="Username">
             </div>
             -->
 
             <!-- PASSWORD FIELD -->
             <div class="form__field">
-                <label for="login__password">
+                <label for="proxy_login__password">
                     <svg class="icon"><use xlink:href="#icon-lock"></use></svg>
                     <span class="hidden">Password</span>
                 </label>
-                <input id="login__password" name="password" type="password" class="form__input" placeholder="Password" required="" autofocus>
+                <input id="proxy_login__password" name="proxy_password" type="password" class="form__input" placeholder="Password" required="" autofocus>
             </div>
 
             <div class="form__field">
@@ -293,16 +293,13 @@
                 e.preventDefault();
                 authorize();
             };
-            password = document.querySelector("#login__password");
+            password = document.querySelector("#proxy_login__password");
             password.focus();
-                    
-            // document.title = location.hostname ? `Login - ${location.hostname}` : 'Authorization';
-            // document.getElementById("host-name").textContent = location.hostname ? location.hostname : 'This page';
         };
 
         function authorize() {
             if (!password.value) return; // No input
-            document.cookie = `%{authorizationCookie}=${password.value}; path=/${"%{cookieMaxAge}" ? `; max-age=%{cookieMaxAge}` : ""}`; // Set authorization cookie
+            document.cookie = `%{authCookie}=${password.value}; path=/${"%{cookieMaxAge}" ? `; max-age=%{cookieMaxAge}` : ""}`; // Set authorization cookie
             location.reload(); // Reload
         }
     </script>
