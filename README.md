@@ -1,4 +1,5 @@
 # HTTP Reverse Proxy
+This project has been re-written as [Yet-Another-Proxy](https://github.com/Lyall-A/Yet-Another-Proxy), there will probably be no more updates here
 
 ## NOTE: You should REALLY use [Nginx](https://www.nginx.com) instead!
 
