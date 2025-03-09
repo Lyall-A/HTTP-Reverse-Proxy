@@ -260,6 +260,7 @@ function connectionHandler(proxyConnection) {
     const splitHeaders = rawHeaders.split("\r\n");
 
     const [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
+    let uri_ = uri;
 
     if (requestLine) {
       // Get headers
@@ -276,7 +277,7 @@ function connectionHandler(proxyConnection) {
       }
 
       // Find service to handle this request with wildcard and IP mapping support
-      const serviceResult = findService(services, hostname, uri);
+      const serviceResult = findService(services, hostname, uri_);
       if (!serviceResult) {
         LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '→', hostname, `[PROXY_SERVICE_NOT_FOUND] tried to reach unknown hostname ${hostname}`);
         return proxyConnection.destroy();
@@ -285,7 +286,7 @@ function connectionHandler(proxyConnection) {
       if (serviceResult.service) {
         service = serviceResult.service;
         if (serviceResult.stripPath) {
-          uri = uri.slice(serviceResult.stripPath.length) || "/";
+          uri_ = uri.slice(serviceResult.stripPath.length) || "/";
         }
       }
 
@@ -462,7 +463,7 @@ function connectionHandler(proxyConnection) {
 
       // Is bypassed URI
       // TODO: make this better
-      const bypassOptions = serviceOptions.uriBypass?.[uri];
+      const bypassOptions = serviceOptions.uriBypass?.[uri_];
       if (bypassOptions) {
         const bypassHeaders = objectDefaults(bypassOptions.headers, { "Content-Length": bypassOptions.data.length || 0 });
         return proxyConnection.write(`${version} ${bypassOptions.statusCode || 200} ${bypassOptions.statusMessage || ""}\r\n${Object.entries(bypassHeaders).map(i => `${i[0]}: ${i[1]}`).join("\r\n")}\r\n\r\n${bypassOptions.data || ""}`);
@@ -470,7 +471,7 @@ function connectionHandler(proxyConnection) {
 
       // Reconstruct data
       const reconstructedData = Buffer.concat([
-        Buffer.from(`${method} ${serviceOptions.forceUri || uri} ${version}`), // Request line
+        Buffer.from(`${method} ${serviceOptions.forceUri || uri_} ${version}`), // Request line
         Buffer.from("\r\n"), // New line
         Buffer.from(Object.entries(headers).map(i => `${i[0]}: ${i[1]}`).join("\r\n")), // Headers
         Buffer.from("\r\n\r\n"), // New line before data
