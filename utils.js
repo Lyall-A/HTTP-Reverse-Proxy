@@ -73,23 +73,50 @@ function getHeaders(splitHeaders) {
 }
 
 /**
- * Find server object using hostname
+ * Find server object using hostname and optional URI for IP mapping and wildcard support.
+ * Supports proxyHostnames with wildcards:
+ *    - A pattern like "foo.*.example.com" will match "foo.bar.example.com".
+ *    - A pattern like "**.example.com" will match "foo.example.com" or "foo.bar.baz.example.com".
+ * For IP mapping, a proxyHostname starting with "@" (e.g. "@/cod") indicates that if the request comes
+ * from an IP address and the URI starts with the specified path ("/cod"), the service should be used
+ * and the matching path stripped from the URI.
  * @param {Map} services A Map of services with keys as identifiers and values as server objects
  * @param {string} hostname Hostname to search for
- * @returns {object|null} Server object or null if not found
+ * @param {string} [uri=""] Request URI (optional, used for IP mapping)
+ * @returns {object|null} If an IP mapping is used, returns an object { service, stripPath },
+ *                        otherwise returns the service object, or null if not found.
  */
-function findService(services, hostname) {
+function findService(services, hostname, uri) {
+  uri = uri || "";
   if (typeof hostname !== "string") return null;
   for (const service of services.values()) {
-    if (service?.proxyHostnames?.some(str =>
-      str.startsWith(".") ? hostname.endsWith(str) :
-        str.endsWith(".") ? hostname.startsWith(str) :
-          hostname === str
-    )) return service;
+    if (service && service.proxyHostnames) {
+      for (const pattern of service.proxyHostnames) {
+        if (pattern.startsWith("@")) {
+          // Handle IP mapping: pattern like "@/cod"
+          // Check if hostname is an IP address and URI starts with the specified path.
+          const pathPrefix = pattern.slice(1);
+          if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) && uri.startsWith(pathPrefix)) {
+            return { service: service, stripPath: pathPrefix };
+          }
+        } else {
+          // Wildcard matching:
+          //   - Replace "**" with ".*"
+          //   - Replace "*" with "[^.]+"
+          //   - Escape dots.
+          let regexPattern = pattern
+            .replace(/\./g, "\\.")
+            .replace(/\*\*/g, ".*")
+            .replace(/\*/g, "[^.]+");
+          regexPattern = "^" + regexPattern + "$";
+          const re = new RegExp(regexPattern, "i");
+          if (re.test(hostname)) return service;
+        }
+      }
+    }
   }
   return null;
 }
-
 
 /**
  * Formats strings with `%{}` syntax and dot notation (eg. `%{hello.world}` with options `{ hello: { world: "Hello, World!" } }`)

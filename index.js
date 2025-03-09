@@ -59,7 +59,6 @@ let globalWhitelist;
 let globalBlacklist;
 let rememberedIps = new Map(); // In-memory IP storage for "rememberIp" authentication
 
-
 function main() {
   const args = process.argv.slice(2);
   const command = args[0];
@@ -176,9 +175,6 @@ function startProxy() {
   });
 
   // Dynamically load services into a map that is live reloaded
-  // This map will include al json files into that folder,
-  // the map will be modified automatically if files are added removed or the content changes
-  // the file name is used as a key to that json (parsed) without extension
   services = createLiveFileMap('./services/*.json', (service, key, filename) => {
     LOG.SERVICE_INFO && console.log(timestamp(), "[SERVICE_INFO] Loaded service:", key, '\n', service);
     return service;
@@ -279,11 +275,18 @@ function connectionHandler(proxyConnection) {
         return proxyConnection.destroy();
       }
 
-      // Find service to handle this request
-      const service = findService(services, hostname);
-      if (!service) {
+      // Find service to handle this request with wildcard and IP mapping support
+      const serviceResult = findService(services, hostname, uri);
+      if (!serviceResult) {
         LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '→', hostname, `[PROXY_SERVICE_NOT_FOUND] tried to reach unknown hostname ${hostname}`);
         return proxyConnection.destroy();
+      }
+      let service = serviceResult;
+      if (serviceResult.service) {
+        service = serviceResult.service;
+        if (serviceResult.stripPath) {
+          uri = uri.slice(serviceResult.stripPath.length) || "/";
+        }
       }
 
       // Make service options inherit default options
@@ -390,7 +393,7 @@ function connectionHandler(proxyConnection) {
               `Clear-Site-Data: "cache", "executionContexts"\r\n` +
               `\r\n`+
               `${authHtml}`);
-  }
+          }
           return false;
         }
         else if (authType === "basic") {
