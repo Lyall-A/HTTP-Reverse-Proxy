@@ -59,6 +59,7 @@ let globalWhitelist;
 let globalBlacklist;
 let rememberedIps = new Map(); // In-memory IP storage for "rememberIp" authentication
 
+
 function main() {
   const args = process.argv.slice(2);
   const command = args[0];
@@ -285,6 +286,20 @@ function connectionHandler(proxyConnection) {
       if (serviceResult.service) {
         service = serviceResult.service;
         if (serviceResult.stripPath) {
+          // If original URI doesn't already contain the stripPath,
+          // attempt to adjust using the Referer header.
+          if (!uri.startsWith(serviceResult.stripPath)) {
+            const referer = getHeader(headers, "Referer");
+            if (referer) {
+              try {
+                const refererUrl = new URL(referer);
+                let prefix = refererUrl.pathname;
+                if (prefix.endsWith("/")) prefix = prefix.slice(0, -1);
+                uri = prefix + uri;
+              } catch(e) {}
+            }
+          }
+          // Strip the prefix.
           uri = uri.slice(serviceResult.stripPath.length) || "/";
         }
       }
