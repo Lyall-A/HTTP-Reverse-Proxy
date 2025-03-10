@@ -59,7 +59,6 @@ let globalWhitelist;
 let globalBlacklist;
 let rememberedIps = new Map(); // In-memory IP storage for "rememberIp" authentication
 
-
 function main() {
   const args = process.argv.slice(2);
   const command = args[0];
@@ -260,7 +259,7 @@ function connectionHandler(proxyConnection) {
     const rawData = splitRawData.join("\r\n\r\n");
     const splitHeaders = rawHeaders.split("\r\n");
 
-    const [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
+    let [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
 
     if (requestLine) {
       // Get headers
@@ -276,27 +275,8 @@ function connectionHandler(proxyConnection) {
         return proxyConnection.destroy();
       }
 
-      // Find service to handle this request with wildcard and IP mapping support
-      let serviceResult = findService(services, hostname, uri);
-      // If not found, check Referer header to adjust the URI if needed
-      if (!serviceResult) {
-        const referer = getHeader(headers, "Referer");
-        if (referer) {
-          try {
-            const refererUrl = new URL(referer);
-            let prefix = refererUrl.pathname;
-            if (prefix.endsWith("/")) prefix = prefix.slice(0, -1);
-            if (prefix && prefix !== "/" && !uri.startsWith(prefix)) {
-              const newUri = prefix + uri;
-              const result = findService(services, hostname, newUri);
-              if (result) {
-                serviceResult = result;
-                uri = newUri;
-              }
-            }
-          } catch(e) {}
-        }
-      }
+      // Find service to handle this request using wildcard, IP mapping, and Referer-based adjustment
+      let serviceResult = findService(services, hostname, uri, headers);
       if (!serviceResult) {
         LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '→', hostname, `[PROXY_SERVICE_NOT_FOUND] tried to reach unknown hostname ${hostname}`);
         return proxyConnection.destroy();
@@ -363,7 +343,7 @@ function connectionHandler(proxyConnection) {
             authorized = checkAuthorization(authTypes[i].toLowerCase(), isLast);
             if (authorized) {
               LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED] Authenticated`);
-              // successfuly authorized add to remembered ips
+              // successfully authorized; add to remembered ips
               if (serviceOptions.authRemembersIp && realIp) {
                 LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_REMEMBER] Added to rememberedIps`);
                 rememberedIps.set(realIp + hostname, Date.now());

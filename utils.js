@@ -83,38 +83,71 @@ function getHeaders(splitHeaders) {
  * @param {Map} services A Map of services with keys as identifiers and values as server objects
  * @param {string} hostname Hostname to search for
  * @param {string} [uri=""] Request URI (optional, used for IP mapping)
- * @returns {object|null} If an IP mapping is used, returns an object { service, stripPath },
- *                        otherwise returns the service object, or null if not found.
+ * @param {object} [headers] - Optional headers object (used to extract Referer).
+ * @returns {object|null} - Returns the matching service (or an object { service, stripPath } for IP mapping) or null if no match is found.
  */
-function findService(services, hostname, uri) {
-  uri = uri || "";
-  if (typeof hostname !== "string") return null;
-  for (const service of services.values()) {
-    if (service && service.proxyHostnames) {
-      for (const pattern of service.proxyHostnames) {
-        if (pattern.startsWith("@")) {
-          // Handle IP mapping: pattern like "@/cod"
-          // Check if hostname is an IP address and URI starts with the specified path.
-          const pathPrefix = pattern.slice(1);
-          if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) && uri.startsWith(pathPrefix)) {
-            return { service: service, stripPath: pathPrefix };
+function findService(services, hostname, uri, headers) {
+  /**
+   * Helper function that attempts to match a service based on hostname and URI.
+   * It supports both IP mapping (using patterns starting with "@") and wildcard matching.
+   *
+   * @param {Map} services - A Map of services.
+   * @param {string} hostname - The request hostname.
+   * @param {string} uri - The request URI.
+   * @returns {object|null} - Returns the service if found, or an object { service, stripPath } for IP mapping; otherwise, null.
+   */
+  function _matchService(services, hostname, uri) {
+    for (const service of services.values()) {
+      if (service && service.proxyHostnames) {
+        for (const pattern of service.proxyHostnames) {
+          if (pattern.startsWith("@")) {
+            // IP mapping: e.g. pattern "@/cod" means if hostname is an IP and uri starts with "/cod"
+            const pathPrefix = pattern.slice(1);
+            if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) && uri.startsWith(pathPrefix)) {
+              return { service, stripPath: pathPrefix };
+            }
+          } else {
+            // Convert wildcard pattern to regex.
+            const regexPattern = "^" + pattern
+              .replace(/\./g, "\\.")
+              .replace(/\*\*/g, ".*")
+              .replace(/\*/g, "[^.]+") + "$";
+            if (new RegExp(regexPattern, "i").test(hostname)) {
+              return service;
+            }
           }
-        } else {
-          // Wildcard matching:
-          //   - Replace "**" with ".*"
-          //   - Replace "*" with "[^.]+"
-          //   - Escape dots.
-          let regexPattern = pattern
-            .replace(/\./g, "\\.")
-            .replace(/\*\*/g, ".*")
-            .replace(/\*/g, "[^.]+");
-          regexPattern = "^" + regexPattern + "$";
-          const re = new RegExp(regexPattern, "i");
-          if (re.test(hostname)) return service;
         }
       }
     }
+    return null;
   }
+
+  // Try matching with the provided URI.
+  let service = _matchService(services, hostname, uri);
+  if (service) return service;
+  
+  // If no match found, attempt to adjust the URI based on the Referer header.
+  if (headers) {
+    const referer = getHeader(headers, "Referer");
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        let prefix = refererUrl.pathname;
+        // Remove a trailing slash if present.
+        if (prefix.endsWith("/")) {
+          prefix = prefix.slice(0, -1);
+        }
+        // If the prefix is non-root and not already present in uri, adjust the URI.
+        if (prefix && prefix !== "/" && !uri.startsWith(prefix)) {
+          const adjustedUri = prefix + uri;
+          return _matchService(services, hostname, adjustedUri);
+        }
+      } catch (e) {
+        // Ignore errors parsing the Referer.
+      }
+    }
+  }
+  
   return null;
 }
 
