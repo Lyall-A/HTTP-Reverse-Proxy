@@ -184,11 +184,11 @@ function startProxy() {
 
   // Start proxy server
   proxyServer = (proxyConfig.tls ? tls : net).createServer({
-    key: fs.existsSync(proxyConfig.key) ? fs.readFileSync(proxyConfig.key) : undefined,
-    cert: fs.existsSync(proxyConfig.cert) ? fs.readFileSync(proxyConfig.cert) : undefined,
+    key: proxyConfig.tls ? fs.readFileSync(proxyConfig.key) : undefined,
+    cert: proxyConfig.tls ? fs.readFileSync(proxyConfig.cert) : undefined,
     ...proxyConfig.additionalProxyServerOptions
   });
-  proxyServer.on("connection", connectionHandler);
+  proxyServer.on(proxyConfig.tls ? "secureConnection" : "connection", connectionHandler);
   proxyServer.listen(proxyConfig.port, proxyConfig.hostname, () => {
     LOG.PROXY_INFO && displaySummary();
     LOG.PROXY_INFO && console.log(timestamp(), '[PROXY_INFO] Proxy started...');
