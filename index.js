@@ -176,9 +176,6 @@ function startProxy() {
   });
 
   // Dynamically load services into a map that is live reloaded
-  // This map will include al json files into that folder,
-  // the map will be modified automatically if files are added removed or the content changes
-  // the file name is used as a key to that json (parsed) without extension
   services = createLiveFileMap('./services/*.json', (service, key, filename) => {
     LOG.SERVICE_INFO && console.log(timestamp(), "[SERVICE_INFO] Loaded service:", key, '\n', service);
     return service;
@@ -187,11 +184,11 @@ function startProxy() {
 
   // Start proxy server
   proxyServer = (proxyConfig.tls ? tls : net).createServer({
-    key: fs.existsSync(proxyConfig.key) ? fs.readFileSync(proxyConfig.key) : undefined,
-    cert: fs.existsSync(proxyConfig.cert) ? fs.readFileSync(proxyConfig.cert) : undefined,
+    key: proxyConfig.tls ? fs.readFileSync(proxyConfig.key) : undefined,
+    cert: proxyConfig.tls ? fs.readFileSync(proxyConfig.cert) : undefined,
     ...proxyConfig.additionalProxyServerOptions
   });
-  proxyServer.on("connection", connectionHandler);
+  proxyServer.on(proxyConfig.tls ? "secureConnection" : "connection", connectionHandler);
   proxyServer.listen(proxyConfig.port, proxyConfig.hostname, () => {
     LOG.PROXY_INFO && displaySummary();
     LOG.PROXY_INFO && console.log(timestamp(), '[PROXY_INFO] Proxy started...');
@@ -263,7 +260,7 @@ function connectionHandler(proxyConnection) {
     const rawData = splitRawData.join("\r\n\r\n");
     const splitHeaders = rawHeaders.split("\r\n");
 
-    const [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
+    let [requestLine, method, uri, version] = splitHeaders.splice(0, 1)[0].match(requestLineRegex) || []; // Get and remove request line from headers
 
     if (requestLine) {
       // Get headers
@@ -279,11 +276,32 @@ function connectionHandler(proxyConnection) {
         return proxyConnection.destroy();
       }
 
-      // Find service to handle this request
-      const service = findService(services, hostname);
-      if (!service) {
+      // Find service to handle this request using wildcard, IP mapping, and Referer-based adjustment
+      let serviceResult = findService(services, hostname, uri, headers);
+      if (!serviceResult) {
         LOG.CONNECTION_REFUSED && console.log(timestamp(), ipFormatted, '→', hostname, `[PROXY_SERVICE_NOT_FOUND] tried to reach unknown hostname ${hostname}`);
         return proxyConnection.destroy();
+      }
+      let service = serviceResult;
+      if (serviceResult.service) {
+        service = serviceResult.service;
+        if (serviceResult.stripPath) {
+          // If original URI doesn't already contain the stripPath,
+          // attempt to adjust using the Referer header.
+          if (!uri.startsWith(serviceResult.stripPath)) {
+            const referer = getHeader(headers, "Referer");
+            if (referer) {
+              try {
+                const refererUrl = new URL(referer);
+                let prefix = refererUrl.pathname;
+                if (prefix.endsWith("/")) prefix = prefix.slice(0, -1);
+                uri = prefix + uri;
+              } catch(e) {}
+            }
+          }
+          // Strip the prefix.
+          uri = uri.slice(serviceResult.stripPath.length) || "/";
+        }
       }
 
       // Make service options inherit default options
@@ -340,7 +358,7 @@ function connectionHandler(proxyConnection) {
             authorized = checkAuthorization(authTypes[i].toLowerCase(), isLast);
             if (authorized) {
               LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_GRANTED] Authenticated`);
-              // successfuly authorized add to remembered ips
+              // successfully authorized; add to remembered ips
               if (serviceOptions.authRemembersIp && realIp) {
                 LOG.AUTH_GRANTED && console.log(timestamp(), ipFormatted, '→', hostname, `[AUTH_REMEMBER] Added to rememberedIps`);
                 rememberedIps.set(realIp + hostname, Date.now());
@@ -390,7 +408,7 @@ function connectionHandler(proxyConnection) {
               `Clear-Site-Data: "cache", "executionContexts"\r\n` +
               `\r\n`+
               `${authHtml}`);
-  }
+          }
           return false;
         }
         else if (authType === "basic") {

@@ -73,23 +73,83 @@ function getHeaders(splitHeaders) {
 }
 
 /**
- * Find server object using hostname
+ * Find server object using hostname and optional URI for IP mapping and wildcard support.
+ * Supports proxyHostnames with wildcards:
+ *    - A pattern like "foo.*.example.com" will match "foo.bar.example.com".
+ *    - A pattern like "**.example.com" will match "foo.example.com" or "foo.bar.baz.example.com".
+ * For IP mapping, a proxyHostname starting with "@" (e.g. "@/cod") indicates that if the request comes
+ * from an IP address and the URI starts with the specified path ("/cod"), the service should be used
+ * and the matching path stripped from the URI.
  * @param {Map} services A Map of services with keys as identifiers and values as server objects
  * @param {string} hostname Hostname to search for
- * @returns {object|null} Server object or null if not found
+ * @param {string} [uri=""] Request URI (optional, used for IP mapping)
+ * @param {object} [headers] - Optional headers object (used to extract Referer).
+ * @returns {object|null} - Returns the matching service (or an object { service, stripPath } for IP mapping) or null if no match is found.
  */
-function findService(services, hostname) {
-  if (typeof hostname !== "string") return null;
-  for (const service of services.values()) {
-    if (service?.proxyHostnames?.some(str =>
-      str.startsWith(".") ? hostname.endsWith(str) :
-        str.endsWith(".") ? hostname.startsWith(str) :
-          hostname === str
-    )) return service;
+function findService(services, hostname, uri, headers) {
+  /**
+   * Helper function that attempts to match a service based on hostname and URI.
+   * It supports both IP mapping (using patterns starting with "@") and wildcard matching.
+   *
+   * @param {Map} services - A Map of services.
+   * @param {string} hostname - The request hostname.
+   * @param {string} uri - The request URI.
+   * @returns {object|null} - Returns the service if found, or an object { service, stripPath } for IP mapping; otherwise, null.
+   */
+  function _matchService(services, hostname, uri) {
+    for (const service of services.values()) {
+      if (service && service.proxyHostnames) {
+        for (const pattern of service.proxyHostnames) {
+          if (pattern.startsWith("@")) {
+            // IP mapping: e.g. pattern "@/cod" means if hostname is an IP and uri starts with "/cod"
+            const pathPrefix = pattern.slice(1);
+            if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) && uri.startsWith(pathPrefix)) {
+              return { service, stripPath: pathPrefix };
+            }
+          } else {
+            // Convert wildcard pattern to regex.
+            const regexPattern = "^" + pattern
+              .replace(/\./g, "\\.")
+              .replace(/\*\*/g, ".*")
+              .replace(/\*/g, "[^.]+") + "$";
+            if (new RegExp(regexPattern, "i").test(hostname)) {
+              return service;
+            }
+          }
+        }
+      }
+    }
+    return null;
   }
+
+  // Try matching with the provided URI.
+  let service = _matchService(services, hostname, uri);
+  if (service) return service;
+  
+  // If no match found, attempt to adjust the URI based on the Referer header.
+  if (headers) {
+    const referer = getHeader(headers, "Referer");
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        let prefix = refererUrl.pathname;
+        // Remove a trailing slash if present.
+        if (prefix.endsWith("/")) {
+          prefix = prefix.slice(0, -1);
+        }
+        // If the prefix is non-root and not already present in uri, adjust the URI.
+        if (prefix && prefix !== "/" && !uri.startsWith(prefix)) {
+          const adjustedUri = prefix + uri;
+          return _matchService(services, hostname, adjustedUri);
+        }
+      } catch (e) {
+        // Ignore errors parsing the Referer.
+      }
+    }
+  }
+  
   return null;
 }
-
 
 /**
  * Formats strings with `%{}` syntax and dot notation (eg. `%{hello.world}` with options `{ hello: { world: "Hello, World!" } }`)
